@@ -19,7 +19,7 @@ const extractRunTime = movie => {
 };
 
 const extractMetascore = movie => {
-  return movie.ratings.metascore / 100 || 0;
+  return movie.ratings.metascore / 10 || 0;
 };
 
 const extractImdbRating = movie => {
