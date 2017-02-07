@@ -25,40 +25,85 @@ export const fetchWatchlistData = userId => {
       })
       .then(json => {
         dispatch(receiveWatchlistData(userId, json.list));
-        json.list.movies.forEach(
-          movie => dispatch(fetchJustWatchData(movie.id, movie.primary.title))
+
+        const batches = json.list.movies.reduce(
+          (accumulator, movie) => {
+            const latestPage = accumulator[accumulator.length - 1] || [];
+            if (latestPage.length >= 50) {
+              accumulator.push([ movie ]);
+            } else {
+              latestPage.push(movie);
+            }
+            return accumulator;
+          },
+          [ [] ]
         );
+
+        batches.forEach(batch => {
+          dispatch(requestJustWatchBatchData(batch));
+          Promise
+            .all(
+              batch.map(
+                movie =>
+                  performJustWatchApiRequest(movie.id, movie.primary.title)
+              )
+            )
+            .then(responses => {
+              dispatch(
+                receiveJustWatchBatchData(
+                  responses.reduce(
+                    (accumulator, item) => {
+                      accumulator[item.imdbId] = item.justwatch;
+                      return accumulator;
+                    },
+                    {}
+                  )
+                )
+              );
+            })
+            .catch(reason => {
+              console.log(reason);
+            });
+        });
       });
   };
 };
 
-export const REQUEST_JUSTWATCH_DATA = 'REQUEST_JUSTWATCH_DATA';
-const requestJustWatchData = (imdbId, title) => {
-  return { type: REQUEST_JUSTWATCH_DATA, imdbId, title };
+export const REQUEST_JUSTWATCH_BATCH_DATA = 'REQUEST_JUSTWATCH_BATCH_DATA';
+const requestJustWatchBatchData = batch => {
+  return { type: REQUEST_JUSTWATCH_BATCH_DATA, batch };
 };
 
-export const RECEIVE_JUSTWATCH_DATA = 'RECEIVE_JUSTWATCH_DATA';
-const receiveJustWatchData = (imdbId, title, data) => {
-  return { type: RECEIVE_JUSTWATCH_DATA, imdbId, title, data };
+export const RECEIVE_JUSTWATCH_BATCH_DATA = 'RECEIVE_JUSTWATCH_BATCH_DATA';
+const receiveJustWatchBatchData = batch => {
+  return { type: RECEIVE_JUSTWATCH_BATCH_DATA, batch };
 };
 
-export const fetchJustWatchData = (imdbId, title) => {
-  return dispatch => {
-    dispatch(requestJustWatchData(imdbId, title));
+const handleErrors = response => {
+  if (!response.ok) {
+    throw Error(response.statusText);
+  }
+  return response;
+};
 
-    fetch('/api/justwatch', {
-      method: 'POST',
-      body: JSON.stringify({ imdbId, title }),
-      headers: {
-        Accept: 'application/json, text/plain, */*',
-        'Content-Type': 'application/json'
-      }
+export const performJustWatchApiRequest = (imdbId, title) => {
+  return fetch('/api/justwatch', {
+    method: 'POST',
+    body: JSON.stringify({ imdbId, title }),
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/json'
+    }
+  })
+    .then(handleErrors)
+    .then(response => {
+      return response.json();
     })
-      .then(response => {
-        return response.json();
-      })
-      .then(json => {
-        dispatch(receiveJustWatchData(imdbId, title, json.item));
-      });
-  };
+    .then(json => {
+      return { imdbId: imdbId, justwatch: json.item };
+    })
+    .catch(error => {
+      console.log(error);
+      return { imdbId: imdbId, justwatch: null };
+    });
 };

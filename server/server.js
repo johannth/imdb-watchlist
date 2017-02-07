@@ -53,10 +53,22 @@ const saveJsonInCache = json => {
 const getJsonFromCachedEntry = cacheEntry => {
   if (cacheEntry.isCached) {
     const cacheValue = JSON.parse(cacheEntry.value);
-    return cacheValue.value;
+    const now = Date.now();
+    if (now - cacheValue.timestamp < 2 * 60 * 1000) {
+      return cacheValue.value;
+    } else {
+      return null;
+    }
   } else {
     return null;
   }
+};
+
+const handleErrors = response => {
+  if (!response.ok) {
+    throw Error(response.statusText);
+  }
+  return response;
 };
 
 app.post('/api/justwatch', (req, res) => {
@@ -79,15 +91,23 @@ app.post('/api/justwatch', (req, res) => {
         'Content-Type': 'application/json'
       }
     })
+      .then(handleErrors)
       .then(response => {
         return response.json();
       })
       .then(json => {
         const possibleItem = json.items && json.items[0];
 
-        if (possibleItem.title !== req.body.title) {
+        if (!possibleItem || possibleItem.title !== req.body.title) {
           res.json({ item: null });
+          return;
         }
+
+        console.log(
+          possibleItem.title,
+          req.body.title,
+          possibleItem.title === req.body.title
+        );
 
         const item = possibleItem;
 

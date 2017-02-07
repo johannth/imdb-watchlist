@@ -7,7 +7,10 @@ const JUSTWATCH_NETFLIX_PROVIDER_ID = 8;
 const JUSTWATCH_AMAZON_PROVIDER_ID = 10;
 const JUSTWATCH_HBO_PROVIDER_ID = 27;
 
-import { RECEIVE_WATCHLIST_DATA, RECEIVE_JUSTWATCH_DATA } from './actions';
+import {
+  RECEIVE_WATCHLIST_DATA,
+  RECEIVE_JUSTWATCH_BATCH_DATA
+} from './actions';
 
 const extractRunTime = movie => {
   const runTimeInMinutes = movie.metadata.runtime / 60;
@@ -129,15 +132,19 @@ const dataReducer = (state = { list: null }, action) => {
   switch (action.type) {
     case RECEIVE_WATCHLIST_DATA:
       return { ...state, list: action.list.movies.map(mapMovieData) };
-    case RECEIVE_JUSTWATCH_DATA:
+
+    case RECEIVE_JUSTWATCH_BATCH_DATA: {
       const list = state.list && state.list.map(movie => {
-          if (movie.id === action.imdbId) {
-            const justwatch = action.data;
+          const justwatchData = action.batch[movie.id];
+          if (justwatchData) {
             const streamability = {
-              netflix: extractOffer(justwatch, JUSTWATCH_NETFLIX_PROVIDER_ID),
-              itunes: extractOffer(justwatch, JUSTWATCH_ITUNES_PROVIDER_ID),
-              amazon: extractOffer(justwatch, JUSTWATCH_AMAZON_PROVIDER_ID),
-              hbo: extractOffer(justwatch, JUSTWATCH_HBO_PROVIDER_ID)
+              netflix: extractOffer(
+                justwatchData,
+                JUSTWATCH_NETFLIX_PROVIDER_ID
+              ),
+              itunes: extractOffer(justwatchData, JUSTWATCH_ITUNES_PROVIDER_ID),
+              amazon: extractOffer(justwatchData, JUSTWATCH_AMAZON_PROVIDER_ID),
+              hbo: extractOffer(justwatchData, JUSTWATCH_HBO_PROVIDER_ID)
             };
             return {
               ...movie,
@@ -149,6 +156,7 @@ const dataReducer = (state = { list: null }, action) => {
           }
         });
       return { ...state, list };
+    }
     default:
       return state;
   }
