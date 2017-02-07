@@ -13,7 +13,7 @@ import {
 } from './actions';
 
 const extractRunTime = movie => {
-  const runTimeInMinutes = movie.metadata.runtime / 60;
+  const runTimeInMinutes = (movie.metadata.runtime || 0) / 60;
   const numberOfEpisodes = movie.metadata.numberOfEpisodes || 1;
   return runTimeInMinutes * numberOfEpisodes;
 };
