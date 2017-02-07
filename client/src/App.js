@@ -41,16 +41,16 @@ const columns = [
     Component: JustWatchCell('netflix')
   },
   {
-    key: 'itunes',
-    header: 'iTunes',
-    sortable: true,
-    Component: JustWatchCell('itunes')
-  },
-  {
     key: 'hbo',
     header: 'HBO',
     sortable: true,
     Component: JustWatchCell('hbo')
+  },
+  {
+    key: 'itunes',
+    header: 'iTunes',
+    sortable: true,
+    Component: JustWatchCell('itunes')
   },
   {
     key: 'amazon',
