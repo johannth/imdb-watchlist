@@ -12,12 +12,18 @@ export const fetchWatchlistData = userId => {
   return dispatch => {
     dispatch(requestWatchlistData(userId));
 
-    fetch('/api')
+    fetch('/api', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Content-Type': 'application/json'
+      }
+    })
       .then(response => {
         return response.json();
       })
       .then(json => {
-        console.log(json);
         dispatch(receiveWatchlistData(userId, []));
       });
   };

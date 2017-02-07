@@ -12,6 +12,9 @@
     "babel-watch": "^2.0.6"
   },
   "dependencies": {
-    "express": "^4.14.1"
+    "body-parser": "^1.16.0",
+    "cheerio": "^0.22.0",
+    "express": "^4.14.1",
+    "node-fetch": "^1.6.3"
   }
 }
