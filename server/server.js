@@ -54,7 +54,7 @@ const getJsonFromCachedEntry = cacheEntry => {
   if (cacheEntry.isCached) {
     const cacheValue = JSON.parse(cacheEntry.value);
     const now = Date.now();
-    if (now - cacheValue.timestamp < 2 * 60 * 1000) {
+    if (now - cacheValue.timestamp < 30 * 60 * 1000) {
       return cacheValue.value;
     } else {
       return null;
@@ -102,12 +102,6 @@ app.post('/api/justwatch', (req, res) => {
           res.json({ item: null });
           return;
         }
-
-        console.log(
-          possibleItem.title,
-          req.body.title,
-          possibleItem.title === req.body.title
-        );
 
         const item = possibleItem;
 
