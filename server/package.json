@@ -12,6 +12,7 @@
     "babel-watch": "^2.0.6"
   },
   "dependencies": {
+    "async-disk-cache": "^1.0.9",
     "body-parser": "^1.16.0",
     "cheerio": "^0.22.0",
     "express": "^4.14.1",

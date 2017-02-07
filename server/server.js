@@ -2,10 +2,11 @@ import express from 'express';
 import fetch from 'node-fetch';
 import cheerio from 'cheerio';
 import bodyParser from 'body-parser';
+import Cache from 'async-disk-cache';
 
 const app = express();
 
-const poorMansCache = {};
+const cache = new Cache('watchlist');
 
 app.use(bodyParser.json());
 
@@ -41,50 +42,71 @@ app.post('/api/watchlist', (req, res) => {
     });
 });
 
-app.post('/api/justwatch', (req, res) => {
-  const cachedResponse = poorMansCache[req.body.imdbId];
-  if (cachedResponse) {
-    console.log(`Serving from cache ${req.body.imdbId}`);
-    res.json(cachedResponse);
-    return;
+const justwatchCacheKey = imdbId => {
+  return `justwatch:${imdbId}`;
+};
+
+const saveJsonInCache = json => {
+  return JSON.stringify({ timestamp: Date.now(), value: json });
+};
+
+const getJsonFromCachedEntry = cacheEntry => {
+  if (cacheEntry.isCached) {
+    const cacheValue = JSON.parse(cacheEntry.value);
+    return cacheValue.value;
+  } else {
+    return null;
   }
+};
 
-  fetch('https://api.justwatch.com/titles/en_US/popular', {
-    method: 'POST',
-    body: JSON.stringify({
-      content_types: [ 'show', 'movie' ],
-      query: req.body.title
-    }),
-    headers: {
-      Accept: 'application/json, text/plain, */*',
-      'Content-Type': 'application/json'
+app.post('/api/justwatch', (req, res) => {
+  cache.get(justwatchCacheKey(req.body.imdbId)).then(cacheEntry => {
+    const cachedResponse = getJsonFromCachedEntry(cacheEntry);
+    if (cachedResponse) {
+      console.log(`Serving from cache ${req.body.imdbId}`);
+      res.json(cachedResponse);
+      return;
     }
-  })
-    .then(response => {
-      return response.json();
-    })
-    .then(json => {
-      const possibleItem = json.items && json.items[0];
 
-      if (possibleItem.title !== req.body.title) {
-        res.json({ item: null });
+    fetch('https://api.justwatch.com/titles/en_US/popular', {
+      method: 'POST',
+      body: JSON.stringify({
+        content_types: [ 'show', 'movie' ],
+        query: req.body.title
+      }),
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Content-Type': 'application/json'
       }
+    })
+      .then(response => {
+        return response.json();
+      })
+      .then(json => {
+        const possibleItem = json.items && json.items[0];
 
-      const item = possibleItem;
-
-      const response = {
-        item: {
-          id: item.id,
-          href: `https://www.justwatch.com${item.full_path}`,
-          offers: item.offers,
-          scoring: item.scoring
+        if (possibleItem.title !== req.body.title) {
+          res.json({ item: null });
         }
-      };
 
-      poorMansCache[req.body.imdbId] = response;
+        const item = possibleItem;
 
-      res.json(response);
-    });
+        const response = {
+          item: {
+            id: item.id,
+            href: `https://www.justwatch.com${item.full_path}`,
+            offers: item.offers,
+            scoring: item.scoring
+          }
+        };
+
+        cache
+          .set(justwatchCacheKey(req.body.imdbId), saveJsonInCache(response))
+          .then(() => {
+            res.json(response);
+          });
+      });
+  });
 });
 
 app.listen(3001, () => {
