@@ -28,7 +28,7 @@ const extractImdbRating = movie => {
 
 const calculateJustwatchMultiplier = justwatch => {
   if (!justwatch) {
-    return 1;
+    return 0.6;
   }
   if (justwatch.netflix) {
     return 5;
@@ -39,7 +39,7 @@ const calculateJustwatchMultiplier = justwatch => {
   } else if (justwatch.amazon) {
     return 2;
   } else {
-    return 0;
+    return 0.5;
   }
 };
 
