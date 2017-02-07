@@ -2,22 +2,12 @@
   "name": "impact-list",
   "version": "0.1.0",
   "private": true,
-  "devDependencies": {
-    "react-scripts": "0.8.5"
-  },
-  "dependencies": {
-    "react": "^15.4.2",
-    "react-dom": "^15.4.2",
-    "react-redux": "^5.0.2",
-    "redux": "^3.6.0",
-    "redux-logger": "^2.8.1",
-    "redux-thunk": "^2.2.0",
-    "sematable": "^1.4.0"
-  },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test --env=jsdom",
-    "eject": "react-scripts eject"
+    "bootstrap": "concurrently \"yarn run bootstrap-server\" \"yarn run bootstrap-client\"",
+    "bootstrap-server": "cd server && yarn install",
+    "bootstrap-client": "cd client && yarn install",
+    "start": "concurrently \"yarn run start-server\" \"yarn run start-client\"",
+    "start-server": "cd server && yarn start",
+    "start-client": "cd client && yarn start"
   }
 }

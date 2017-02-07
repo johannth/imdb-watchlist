@@ -6,7 +6,9 @@ import { createStore, applyMiddleware } from 'redux';
 import thunkMiddleware from 'redux-thunk';
 import createLogger from 'redux-logger';
 
-import App, { rootReducer } from './App';
+import App from './App';
+import rootReducer from './reducers';
+import { fetchWatchlistData } from './actions';
 import './index.css';
 
 const loggerMiddleware = createLogger();
@@ -20,3 +22,5 @@ ReactDOM.render(
   <Provider store={store}><App /></Provider>,
   document.getElementById('root')
 );
+
+store.dispatch(fetchWatchlistData('ur10614064'));

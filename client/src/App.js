@@ -1,17 +1,8 @@
 import React, { Component, PropTypes } from 'react';
-import { combineReducers } from 'redux';
-import sematable, { Table, reducer as sematableReducer } from 'sematable';
+
+import sematable, { Table } from 'sematable';
 
 import './App.css';
-
-const appReducer = (state = {}, action) => {
-  return state;
-};
-
-export const rootReducer = combineReducers({
-  sematable: sematableReducer,
-  appReducer
-});
 
 const columns = [
   {
@@ -43,5 +34,4 @@ const App = () => {
     />
   );
 };
-
 export default App;
