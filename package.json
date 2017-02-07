@@ -9,5 +9,9 @@
     "start": "concurrently \"yarn run start-server\" \"yarn run start-client\"",
     "start-server": "cd server && yarn start",
     "start-client": "cd client && yarn start"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "concurrently": "^3.1.0"
   }
 }

@@ -5,9 +5,11 @@ import bodyParser from 'body-parser';
 
 const app = express();
 
+const poorMansCache = {};
+
 app.use(bodyParser.json());
 
-app.post('/api', (req, res) => {
+app.post('/api/watchlist', (req, res) => {
   fetch(`http://www.imdb.com/user/${req.body.userId}/watchlist?view=detail`)
     .then(response => response.text())
     .then(text => {
@@ -36,6 +38,52 @@ app.post('/api', (req, res) => {
 
           res.json({ list });
         });
+    });
+});
+
+app.post('/api/justwatch', (req, res) => {
+  const cachedResponse = poorMansCache[req.body.imdbId];
+  if (cachedResponse) {
+    console.log(`Serving from cache ${req.body.imdbId}`);
+    res.json(cachedResponse);
+    return;
+  }
+
+  fetch('https://api.justwatch.com/titles/en_US/popular', {
+    method: 'POST',
+    body: JSON.stringify({
+      content_types: [ 'show', 'movie' ],
+      query: req.body.title
+    }),
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/json'
+    }
+  })
+    .then(response => {
+      return response.json();
+    })
+    .then(json => {
+      const possibleItem = json.items && json.items[0];
+
+      if (possibleItem.title !== req.body.title) {
+        res.json({ item: null });
+      }
+
+      const item = possibleItem;
+
+      const response = {
+        item: {
+          id: item.id,
+          href: `https://www.justwatch.com${item.full_path}`,
+          offers: item.offers,
+          scoring: item.scoring
+        }
+      };
+
+      poorMansCache[req.body.imdbId] = response;
+
+      res.json(response);
     });
 });
 

@@ -13,6 +13,15 @@ const TitleCell = ({ row }) => {
   return <a target="_blank" href={row.href}>{row.title}</a>;
 };
 
+const JustWatchCell = key => ({ row }) => {
+  const href = row[key];
+  if (href) {
+    return <a target="_blank" href={row[key]}>X</a>;
+  } else {
+    return <span />;
+  }
+};
+
 const columns = [
   { key: 'id', header: 'ID', primaryKey: true, hidden: true },
   {
@@ -25,6 +34,30 @@ const columns = [
   { key: 'runTime', header: 'Run Time (min)', sortable: true },
   { key: 'metascore', header: 'Metascore', sortable: true },
   { key: 'imdbRating', header: 'IMDB Rating', sortable: true },
+  {
+    key: 'netflix',
+    header: 'Netflix',
+    sortable: true,
+    Component: JustWatchCell('netflix')
+  },
+  {
+    key: 'itunes',
+    header: 'iTunes',
+    sortable: true,
+    Component: JustWatchCell('itunes')
+  },
+  {
+    key: 'hbo',
+    header: 'HBO',
+    sortable: true,
+    Component: JustWatchCell('hbo')
+  },
+  {
+    key: 'amazon',
+    header: 'Amazon',
+    sortable: true,
+    Component: JustWatchCell('amazon')
+  },
   { key: 'priority', header: 'Priority', sortable: true }
 ];
 
@@ -33,7 +66,6 @@ class MovieTable extends Component {
     return <Table {...this.props} columns={columns} />;
   }
 }
-MovieTable.propTypes = { data: PropTypes.array.isRequired };
 
 const MovieTableContainer = sematable('movies', MovieTable, columns, {
   showPageSize: false,

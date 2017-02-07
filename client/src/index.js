@@ -13,10 +13,7 @@ import './index.css';
 
 const loggerMiddleware = createLogger();
 
-let store = createStore(
-  rootReducer,
-  applyMiddleware(thunkMiddleware, loggerMiddleware)
-);
+let store = createStore(rootReducer, applyMiddleware(thunkMiddleware));
 
 ReactDOM.render(
   <Provider store={store}><App /></Provider>,
