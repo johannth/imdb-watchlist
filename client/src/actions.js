@@ -4,8 +4,8 @@ const requestWatchlistData = userId => {
 };
 
 export const RECEIVE_WATCHLIST_DATA = 'RECEIVE_WATCHLIST_DATA';
-const receiveWatchlistData = (userId, movies) => {
-  return { type: RECEIVE_WATCHLIST_DATA, userId, movies };
+const receiveWatchlistData = (userId, list) => {
+  return { type: RECEIVE_WATCHLIST_DATA, userId, list };
 };
 
 export const fetchWatchlistData = userId => {
@@ -24,7 +24,7 @@ export const fetchWatchlistData = userId => {
         return response.json();
       })
       .then(json => {
-        dispatch(receiveWatchlistData(userId, []));
+        dispatch(receiveWatchlistData(userId, json.list));
       });
   };
 };

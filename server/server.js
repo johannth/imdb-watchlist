@@ -17,20 +17,24 @@ app.post('/api', (req, res) => {
 
       const watchlistData = JSON.parse(initialStateText);
 
-      const list = { id: watchlistData.list.id, name: watchlistData.list.name };
-
       const movieIds = watchlistData.list.items.map(i => i.const);
 
       return fetch(
         `http://www.imdb.com/title/data?ids=${movieIds.join(
           ','
-        )}&pageId=${list.id}&pageType=list&subpageType=watchlist`
+        )}&pageId=${watchlistData.list.id}&pageType=list&subpageType=watchlist`
       )
         .then(response => response.json())
         .then(movieData => {
-          const movies = movieIds.map(movieId => movieData[movieId]);
+          const movies = movieIds.map(movieId => movieData[movieId].title);
 
-          res.json({ list, movies });
+          const list = {
+            id: watchlistData.list.id,
+            name: watchlistData.list.name,
+            movies
+          };
+
+          res.json({ list });
         });
     });
 });
