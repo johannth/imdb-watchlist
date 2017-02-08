@@ -11,6 +11,8 @@ import rootReducer from './reducers';
 import { fetchWatchlistData } from './actions';
 import './index.css';
 
+import { IMDB_ID } from './constants';
+
 const loggerMiddleware = createLogger();
 
 let store = createStore(
@@ -23,4 +25,4 @@ ReactDOM.render(
   document.getElementById('root')
 );
 
-store.dispatch(fetchWatchlistData('ur10614064'));
+store.dispatch(fetchWatchlistData(IMDB_ID));
