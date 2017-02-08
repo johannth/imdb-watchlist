@@ -156,10 +156,15 @@ const fetchConfirmNetflixDataForBatch = (dispatch, justWatchDataForBatch) => {
     .all(
       Object
         .entries(justWatchDataForBatch)
-        .filter(([ imdbId, justwatchData ]) => justwatchData.netflix)
+        .filter(
+          ([ imdbId, justwatchData ]) => justwatchData.streamability.netflix
+        )
         .map(
           ([ imdbId, justwatchData ]) =>
-            performConfirmNetflixApiRequest(imdbId, justwatchData.netflix)
+            performConfirmNetflixApiRequest(
+              imdbId,
+              justwatchData.streamability.netflix
+            )
         )
     )
     .then(responses => {

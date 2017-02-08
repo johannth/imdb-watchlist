@@ -60,6 +60,7 @@ const createInitialMovieData = rawMovieData => {
     href: `http://www.imdb.com${rawMovieData.primary.href}`,
     runTime: extractRunTime(rawMovieData),
     metascore: extractMetascore(rawMovieData),
+    rottenTomatoes: null,
     imdbRating: extractImdbRating(rawMovieData),
     netflix: null,
     itunes: null,
@@ -71,7 +72,11 @@ const createInitialMovieData = rawMovieData => {
 };
 
 const updateMovieFromJustwatchData = (movie, justwatchData) => {
-  return { ...movie, ...justwatchData };
+  return {
+    ...movie,
+    ...justwatchData.streamability,
+    rottenTomatoes: justwatchData.scoring.rottenTomatoes
+  };
 };
 
 const updateMovieFromBechdelData = (movie, bechdelData) => {

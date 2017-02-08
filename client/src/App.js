@@ -33,6 +33,7 @@ const columns = [
   },
   { key: 'runTime', header: 'Run Time (min)', sortable: true },
   { key: 'metascore', header: 'Metascore', sortable: true },
+  { key: 'rottenTomatoes', header: 'Tomatometer', sortable: true },
   { key: 'imdbRating', header: 'IMDB Rating', sortable: true },
   {
     key: 'netflix',

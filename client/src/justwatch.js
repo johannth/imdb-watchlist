@@ -64,11 +64,23 @@ const extractOffer = (justwatch, providerId) => {
   }
 };
 
+const extractRottenTomatoes = justwatch => {
+  // eslint-disable-next-line no-mixed-operators
+  const scoring = justwatch && justwatch.scoring || [];
+  const possibleScore = scoring.filter(
+    score => score.provider_type === 'tomato:meter'
+  )[0];
+  return possibleScore ? possibleScore.value : null;
+};
+
 export const extractJustWatchDataFromResponse = response => {
   return {
-    netflix: extractOffer(response, JUSTWATCH_NETFLIX_PROVIDER_ID),
-    itunes: extractOffer(response, JUSTWATCH_ITUNES_PROVIDER_ID),
-    amazon: extractOffer(response, JUSTWATCH_AMAZON_PROVIDER_ID),
-    hbo: extractOffer(response, JUSTWATCH_HBO_PROVIDER_ID)
+    streamability: {
+      netflix: extractOffer(response, JUSTWATCH_NETFLIX_PROVIDER_ID),
+      itunes: extractOffer(response, JUSTWATCH_ITUNES_PROVIDER_ID),
+      amazon: extractOffer(response, JUSTWATCH_AMAZON_PROVIDER_ID),
+      hbo: extractOffer(response, JUSTWATCH_HBO_PROVIDER_ID)
+    },
+    scoring: { rottenTomatoes: extractRottenTomatoes(response) }
   };
 };
