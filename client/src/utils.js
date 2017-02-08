@@ -5,7 +5,7 @@ export const handleErrors = response => {
   return response;
 };
 
-export const reduceListToObject = (list, keyPath, itemPath) => {
+export const reduceListToMap = (list, keyPath, itemPath) => {
   return list.reduce(
     (accumulator, item) => {
       accumulator[item[keyPath]] = item[itemPath];

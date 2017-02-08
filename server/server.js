@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 import cheerio from 'cheerio';
 import bodyParser from 'body-parser';
 import Cache from 'async-disk-cache';
+import request from 'request';
 
 const app = express();
 
@@ -163,6 +164,52 @@ app.post('/api/bechdel', (req, res) => {
           .set(bechdelCacheKey(req.body.imdbId), saveJsonInCache(response))
           .then(() => {
             res.json(response);
+          });
+      });
+  });
+});
+
+const netflixCacheKey = imdbId => {
+  return `netflix:${imdbId}`;
+};
+
+// We get Netflix urls from JustWatch which work for the U.S. Netflix.
+// Those won't necessary work on the Icelandic Netflix. The movie
+// seems to have the same ID though so we try to see if a localized
+// url returns 200.
+app.post('/api/netflix', (req, res) => {
+  cache.get(netflixCacheKey(req.body.imdbId)).then(cacheEntry => {
+    if (!req.body.netflix) {
+      res.json({ item: null });
+      return;
+    }
+
+    const cachedResponse = getJsonFromCachedEntry(cacheEntry);
+    if (cachedResponse) {
+      console.log(`Serving from cache ${req.body.imdbId}`);
+      res.json(cachedResponse);
+      return;
+    }
+
+    const locale = req.body.locale;
+    const netflixUrlInLocale = req.body.netflix
+      .replace('/title/', `/${locale}/title/`)
+      .replace('http://', 'https://');
+
+    request({ method: 'GET', followRedirect: false, url: netflixUrlInLocale }, (
+      error,
+      response,
+      body
+    ) =>
+      {
+        const payload = {
+          netflix: response.statusCode == 200 ? netflixUrlInLocale : null
+        };
+
+        cache
+          .set(netflixCacheKey(req.body.imdbId), saveJsonInCache(payload))
+          .then(() => {
+            res.json(payload);
           });
       });
   });
