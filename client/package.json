@@ -1,25 +1,26 @@
 {
-  "name": "impact-list-client",
-  "version": "0.1.0",
-  "private": true,
-  "proxy": "http://localhost:3001/",
-  "devDependencies": {
-    "react-scripts": "0.8.5"
-  },
-  "dependencies": {
-    "immutable": "^3.8.1",
-    "react": "^15.4.2",
-    "react-dom": "^15.4.2",
-    "react-redux": "^5.0.2",
-    "redux": "^3.6.0",
-    "redux-logger": "^2.8.1",
-    "redux-thunk": "^2.2.0",
-    "sematable": "^1.4.0"
-  },
+  "name": "imdb-watchlist-client",
+  "version": "0.0.1",
+  "main": "index.js",
+  "author": "Jóhann Þ. Bergþórsson <johann.thorvaldur@gmail.com>",
+  "license": "MIT",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test --env=jsdom",
-    "eject": "react-scripts eject"
+    "start": "webpack-dev-server --hot --inline --content-base src/ --host 0.0.0.0",
+    "build": "rm -r dist && TIER=production webpack",
+    "test": "elm-test"
+  },
+  "devDependencies": {
+    "elm-test": "^0.18.2",
+    "autoprefixer": "^6.5.2",
+    "css-loader": "^0.25.0",
+    "elm-hot-loader": "^0.5.0",
+    "elm-webpack-loader": "^3.1.0",
+    "extract-text-webpack-plugin": "^1.0.1",
+    "html-webpack-plugin": "^2.24.1",
+    "postcss-loader": "^1.1.1",
+    "style-loader": "^0.13.1",
+    "webpack": "^1.13.3",
+    "webpack-dev-server": "^1.16.2",
+    "webpack-merge": "^0.15.0"
   }
 }
