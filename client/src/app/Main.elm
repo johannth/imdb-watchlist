@@ -110,6 +110,23 @@ rootView { movies, tableState, buildInfo } =
         ]
 
 
+config : Table.Config Movie Msg
+config =
+    Table.config
+        { toId = .id
+        , toMsg = SetTableState
+        , columns =
+            [ movieTitleColumn
+            , movieRunTimeColumn
+            ]
+        }
+
+
+buildInfoView : BuildInfo -> Html Msg
+buildInfoView buildInfo =
+    text ("Version: " ++ buildInfo.time ++ " " ++ (String.slice 0 8 buildInfo.version) ++ "-" ++ buildInfo.tier)
+
+
 movieTitleColumn : Table.Column Movie Msg
 movieTitleColumn =
     Table.veryCustomColumn
@@ -124,19 +141,20 @@ movieTitleCell { title, imdbUrl } =
     Table.HtmlDetails [] [ a [ href imdbUrl, target "_blank" ] [ text title ] ]
 
 
-config : Table.Config Movie Msg
-config =
-    Table.config
-        { toId = .id
-        , toMsg = SetTableState
-        , columns =
-            [ movieTitleColumn ]
-        }
+movieRunTimeColumn : Table.Column Movie Msg
+movieRunTimeColumn =
+    let
+        extractRunTimeWithDefault movie =
+            Maybe.withDefault 0 movie.runTime
 
-
-buildInfoView : BuildInfo -> Html Msg
-buildInfoView buildInfo =
-    text ("Version: " ++ buildInfo.time ++ " " ++ (String.slice 0 8 buildInfo.version) ++ "-" ++ buildInfo.tier)
+        runTimeToString movie =
+            Maybe.withDefault "?" (Maybe.map toString movie.runTime)
+    in
+        Table.customColumn
+            { name = "Run Time"
+            , viewData = runTimeToString
+            , sorter = Table.increasingOrDecreasingBy extractRunTimeWithDefault
+            }
 
 
 
@@ -147,6 +165,7 @@ type alias Movie =
     { id : String
     , title : String
     , imdbUrl : String
+    , runTime : Maybe Int
     }
 
 
@@ -173,15 +192,33 @@ decodeWatchlistDataIntoRows =
 
 decodeWatchlistRowIntoMovie : Decode.Decoder Movie
 decodeWatchlistRowIntoMovie =
-    Decode.map3 Movie
+    Decode.map4 Movie
         (Decode.at [ "id" ] Decode.string)
         (Decode.at [ "primary", "title" ] Decode.string)
-        (Decode.at [ "primary", "href" ] decodeHref)
+        decodeImdbUrl
+        decodeMovieRunTime
 
 
-decodeHref : Decode.Decoder String
-decodeHref =
-    Decode.string |> Decode.andThen (\path -> Decode.succeed ("http://www.imdb.com" ++ path))
+decodeImdbUrl : Decode.Decoder String
+decodeImdbUrl =
+    Decode.map (\path -> "http://www.imdb.com" ++ path)
+        (Decode.at [ "primary", "href" ] Decode.string)
+
+
+decodeMovieRunTime : Decode.Decoder (Maybe Int)
+decodeMovieRunTime =
+    Decode.map2 calculateMovieRunTime
+        (Decode.maybe (Decode.at [ "metadata", "runtime" ] Decode.int))
+        (Decode.maybe (Decode.at [ "metadata", "numberOfEpisodes" ] Decode.int))
+
+
+calculateMovieRunTime : Maybe Int -> Maybe Int -> Maybe Int
+calculateMovieRunTime maybeRunTime maybeNumberOfEpisodes =
+    let
+        numberOfEpisodes =
+            Maybe.withDefault 1 maybeNumberOfEpisodes
+    in
+        Maybe.map (\runTime -> (runTime * numberOfEpisodes) // 60) maybeRunTime
 
 
 
