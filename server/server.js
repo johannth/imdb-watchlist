@@ -4,15 +4,17 @@ import cheerio from 'cheerio';
 import bodyParser from 'body-parser';
 import Cache from 'async-disk-cache';
 import request from 'request';
+import cors from 'cors';
 
 const app = express();
 
 const cache = new Cache('watchlist');
 
 app.use(bodyParser.json());
+app.use(cors());
 
-app.post('/api/watchlist', (req, res) => {
-  fetch(`http://www.imdb.com/user/${req.body.userId}/watchlist?view=detail`)
+app.get('/api/watchlist', (req, res) => {
+  fetch(`http://www.imdb.com/user/${req.query.userId}/watchlist?view=detail`)
     .then(response => response.text())
     .then(text => {
       const initialStateRegex = /IMDbReactInitialState\.push\((\{.+\})\);/g;
