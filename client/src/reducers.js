@@ -2,15 +2,16 @@ import { combineReducers } from 'redux';
 
 import { reducer as sematableReducer } from 'sematable';
 
+import {
+  RECEIVE_WATCHLIST_DATA,
+  RECEIVE_JUSTWATCH_BATCH_DATA,
+  RECEIVE_BECHDEL_BATCH_DATA
+} from './actions';
+
 const JUSTWATCH_ITUNES_PROVIDER_ID = 2;
 const JUSTWATCH_NETFLIX_PROVIDER_ID = 8;
 const JUSTWATCH_AMAZON_PROVIDER_ID = 10;
 const JUSTWATCH_HBO_PROVIDER_ID = 27;
-
-import {
-  RECEIVE_WATCHLIST_DATA,
-  RECEIVE_JUSTWATCH_BATCH_DATA
-} from './actions';
 
 const extractRunTime = movie => {
   const runTimeInMinutes = (movie.metadata.runtime || 0) / 60;
@@ -26,31 +27,31 @@ const extractImdbRating = movie => {
   return movie.ratings.rating || 0;
 };
 
-const calculateJustwatchMultiplier = justwatch => {
-  if (!justwatch) {
-    return 0.6;
-  }
-  if (justwatch.netflix) {
+const calculateJustwatchMultiplier = movie => {
+  if (movie.netflix) {
     return 5;
-  } else if (justwatch.hbo) {
+  } else if (movie.hbo) {
     return 4;
-  } else if (justwatch.itunes) {
+  } else if (movie.itunes) {
     return 3;
-  } else if (justwatch.amazon) {
+  } else if (movie.amazon) {
     return 2;
   } else {
     return 0.5;
   }
 };
 
-const calculateShouldWatch = (movie, justwatch) => {
+const calculatePriority = movie => {
   const metascore = movie.metascore;
   const imdbRating = movie.imdbRating;
   const averageRating = 0.5 * metascore + 0.5 * imdbRating;
   const runTimeInMinutes = movie.runTime;
-  const justwatchMultiplier = calculateJustwatchMultiplier(justwatch);
+  const justwatchMultiplier = calculateJustwatchMultiplier(movie);
+  const bechdelMultiplier = (movie.bechdel || 0) + 0.5;
   if (runTimeInMinutes && runTimeInMinutes > 0) {
-    return justwatchMultiplier * (averageRating / runTimeInMinutes * 100);
+    return bechdelMultiplier *
+      justwatchMultiplier *
+      (averageRating / runTimeInMinutes * 100);
   } else {
     return 0;
   }
@@ -116,46 +117,71 @@ const compareOptions = (offerA, offerB) => {
   return comparator;
 };
 
-const mapMovieData = rawMovieData => {
-  const movie = {
+const createInitialMovieData = rawMovieData => {
+  return {
     id: rawMovieData.id,
     title: rawMovieData.primary.title,
     href: `http://www.imdb.com${rawMovieData.primary.href}`,
     runTime: extractRunTime(rawMovieData),
     metascore: extractMetascore(rawMovieData),
-    imdbRating: extractImdbRating(rawMovieData)
+    imdbRating: extractImdbRating(rawMovieData),
+    netflix: null,
+    itunes: null,
+    amazon: null,
+    hbo: null,
+    bechdel: null,
+    priority: null
   };
-  return { ...movie, priority: calculateShouldWatch(movie, null) };
+};
+
+const updateMovieFromJustwatchData = (movie, justwatchData) => {
+  const streamability = {
+    netflix: extractOffer(justwatchData, JUSTWATCH_NETFLIX_PROVIDER_ID),
+    itunes: extractOffer(justwatchData, JUSTWATCH_ITUNES_PROVIDER_ID),
+    amazon: extractOffer(justwatchData, JUSTWATCH_AMAZON_PROVIDER_ID),
+    hbo: extractOffer(justwatchData, JUSTWATCH_HBO_PROVIDER_ID)
+  };
+  return { ...movie, ...streamability };
+};
+
+const updateMovieFromBechdelData = (movie, bechdelData) => {
+  return { ...movie, bechdel: bechdelData.rating };
+};
+
+const updateMoviesWithPriority = list => {
+  return list.map(movie => {
+    return { ...movie, priority: calculatePriority(movie) };
+  });
 };
 
 const dataReducer = (state = { list: null }, action) => {
   switch (action.type) {
-    case RECEIVE_WATCHLIST_DATA:
-      return { ...state, list: action.list.movies.map(mapMovieData) };
-
+    case RECEIVE_WATCHLIST_DATA: {
+      const list = action.list.movies.map(createInitialMovieData);
+      return { ...state, list: updateMoviesWithPriority(list) };
+    }
     case RECEIVE_JUSTWATCH_BATCH_DATA: {
       const list = state.list && state.list.map(movie => {
           const justwatchData = action.batch[movie.id];
           if (justwatchData) {
-            const streamability = {
-              netflix: extractOffer(
-                justwatchData,
-                JUSTWATCH_NETFLIX_PROVIDER_ID
-              ),
-              itunes: extractOffer(justwatchData, JUSTWATCH_ITUNES_PROVIDER_ID),
-              amazon: extractOffer(justwatchData, JUSTWATCH_AMAZON_PROVIDER_ID),
-              hbo: extractOffer(justwatchData, JUSTWATCH_HBO_PROVIDER_ID)
-            };
-            return {
-              ...movie,
-              ...streamability,
-              priority: calculateShouldWatch(movie, streamability)
-            };
+            return updateMovieFromJustwatchData(movie, justwatchData);
           } else {
             return movie;
           }
         });
-      return { ...state, list };
+      return { ...state, list: updateMoviesWithPriority(list) };
+    }
+
+    case RECEIVE_BECHDEL_BATCH_DATA: {
+      const list = state.list && state.list.map(movie => {
+          const bechdelData = action.batch[movie.id];
+          if (bechdelData) {
+            return updateMovieFromBechdelData(movie, bechdelData);
+          } else {
+            return movie;
+          }
+        });
+      return { ...state, list: updateMoviesWithPriority(list) };
     }
     default:
       return state;

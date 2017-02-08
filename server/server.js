@@ -123,6 +123,51 @@ app.post('/api/justwatch', (req, res) => {
   });
 });
 
+const bechdelCacheKey = imdbId => {
+  return `bechdel:${imdbId}`;
+};
+
+app.post('/api/bechdel', (req, res) => {
+  cache.get(bechdelCacheKey(req.body.imdbId)).then(cacheEntry => {
+    const cachedResponse = getJsonFromCachedEntry(cacheEntry);
+    if (cachedResponse) {
+      console.log(`Serving from cache ${req.body.imdbId}`);
+      res.json(cachedResponse);
+      return;
+    }
+
+    const imdbIdWithoutPrefix = req.body.imdbId.replace('tt', '');
+    const url = `http://bechdeltest.com/api/v1/getMovieByImdbId?imdbid=${imdbIdWithoutPrefix}`;
+
+    fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(handleErrors)
+      .then(response => {
+        return response.json();
+      })
+      .then(json => {
+        if (json.status) {
+          return null;
+        }
+        return json;
+      })
+      .then(json => {
+        const response = { item: json };
+
+        cache
+          .set(bechdelCacheKey(req.body.imdbId), saveJsonInCache(response))
+          .then(() => {
+            res.json(response);
+          });
+      });
+  });
+});
+
 app.listen(3001, () => {
   console.log('App listening on port 3001!');
 });

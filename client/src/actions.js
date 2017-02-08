@@ -1,3 +1,5 @@
+import { reduceListToObject, handleErrors, splitIntoBatches } from './utils';
+
 export const REQUEST_WATCHLIST_DATA = 'REQUEST_WATCHLIST_DATA';
 const requestWatchlistData = userId => {
   return { type: REQUEST_WATCHLIST_DATA, userId };
@@ -26,18 +28,7 @@ export const fetchWatchlistData = userId => {
       .then(json => {
         dispatch(receiveWatchlistData(userId, json.list));
 
-        const batches = json.list.movies.reduce(
-          (accumulator, movie) => {
-            const latestPage = accumulator[accumulator.length - 1] || [];
-            if (latestPage.length >= 50) {
-              accumulator.push([ movie ]);
-            } else {
-              latestPage.push(movie);
-            }
-            return accumulator;
-          },
-          [ [] ]
-        );
+        const batches = splitIntoBatches(json.list.movies, 50);
 
         batches.forEach(batch => {
           dispatch(requestJustWatchBatchData(batch));
@@ -51,13 +42,21 @@ export const fetchWatchlistData = userId => {
             .then(responses => {
               dispatch(
                 receiveJustWatchBatchData(
-                  responses.reduce(
-                    (accumulator, item) => {
-                      accumulator[item.imdbId] = item.justwatch;
-                      return accumulator;
-                    },
-                    {}
-                  )
+                  reduceListToObject(responses, 'imdbId', 'justwatch')
+                )
+              );
+            })
+            .catch(reason => {
+              console.log(reason);
+            });
+
+          dispatch(requestBechdelBatchData(batch));
+          Promise
+            .all(batch.map(movie => performBechdelApiRequest(movie.id)))
+            .then(responses => {
+              dispatch(
+                receiveBechdelBatchData(
+                  reduceListToObject(responses, 'imdbId', 'bechdel')
                 )
               );
             })
@@ -79,13 +78,6 @@ const receiveJustWatchBatchData = batch => {
   return { type: RECEIVE_JUSTWATCH_BATCH_DATA, batch };
 };
 
-const handleErrors = response => {
-  if (!response.ok) {
-    throw Error(response.statusText);
-  }
-  return response;
-};
-
 export const performJustWatchApiRequest = (imdbId, title) => {
   return fetch('/api/justwatch', {
     method: 'POST',
@@ -105,5 +97,37 @@ export const performJustWatchApiRequest = (imdbId, title) => {
     .catch(error => {
       console.log(error);
       return { imdbId: imdbId, justwatch: null };
+    });
+};
+
+export const REQUEST_BECHDEL_BATCH_DATA = 'REQUEST_BECHDEL_BATCH_DATA';
+const requestBechdelBatchData = batch => {
+  return { type: REQUEST_BECHDEL_BATCH_DATA, batch };
+};
+
+export const RECEIVE_BECHDEL_BATCH_DATA = 'RECEIVE_BECHDEL_BATCH_DATA';
+const receiveBechdelBatchData = batch => {
+  return { type: RECEIVE_BECHDEL_BATCH_DATA, batch };
+};
+
+export const performBechdelApiRequest = imdbId => {
+  return fetch('/api/bechdel', {
+    method: 'POST',
+    body: JSON.stringify({ imdbId }),
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/json'
+    }
+  })
+    .then(handleErrors)
+    .then(response => {
+      return response.json();
+    })
+    .then(json => {
+      return { imdbId: imdbId, bechdel: json.item };
+    })
+    .catch(error => {
+      console.log(error);
+      return { imdbId: imdbId, bechdel: null };
     });
 };

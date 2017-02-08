@@ -58,6 +58,7 @@ const columns = [
     sortable: true,
     Component: JustWatchCell('amazon')
   },
+  { key: 'bechdel', header: 'Bechdel', sortable: true },
   { key: 'priority', header: 'Priority', sortable: true }
 ];
 
