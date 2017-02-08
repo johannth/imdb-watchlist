@@ -6,6 +6,7 @@ import Http
 import String
 import Json.Decode as Decode
 import Table
+import Dict
 
 
 -- Hot Loading Requires the program to accept flags
@@ -32,6 +33,16 @@ main =
 -- MODEL
 
 
+type alias Movie =
+    { id : String
+    , title : String
+    , imdbUrl : String
+    , runTime : Maybe Int
+    , metascore : Maybe Int
+    , imdbRating : Maybe Int
+    }
+
+
 type alias BuildInfo =
     { version : String
     , time : String
@@ -40,7 +51,8 @@ type alias BuildInfo =
 
 
 type alias Model =
-    { movies : Maybe (List Movie)
+    { list : Maybe (List String)
+    , movies : Dict.Dict String Movie
     , buildInfo : BuildInfo
     , tableState : Table.State
     }
@@ -50,7 +62,8 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         model =
-            { movies = Maybe.Nothing
+            { list = Maybe.Nothing
+            , movies = Dict.empty
             , tableState = Table.initialSort "Title"
             , buildInfo = BuildInfo flags.build_version flags.build_time flags.build_tier
             }
@@ -69,6 +82,11 @@ type Msg
     | SetTableState Table.State
 
 
+combine : (a -> b) -> (a -> c) -> (a -> ( b, c ))
+combine f g =
+    \x -> ( f (x), g (x) )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -77,10 +95,17 @@ update msg model =
             , Cmd.none
             )
 
-        LoadWatchList (Ok movies) ->
-            ( { model | movies = Maybe.Just movies }
-            , Cmd.none
-            )
+        LoadWatchList (Ok watchListMovies) ->
+            let
+                list =
+                    List.map .id watchListMovies
+
+                newMovies =
+                    Dict.fromList (List.map (combine .id identity) watchListMovies)
+            in
+                ( { model | list = Maybe.Just list, movies = Dict.union newMovies model.movies }
+                , Cmd.none
+                )
 
         SetTableState newState ->
             ( { model | tableState = newState }
@@ -93,16 +118,20 @@ update msg model =
 
 
 rootView : Model -> Html Msg
-rootView { movies, tableState, buildInfo } =
+rootView { list, movies, tableState, buildInfo } =
     div [ id "content" ]
         [ h1 [ id "title" ] [ text "Watchlist" ]
         , div [ id "list" ]
-            [ case movies of
+            [ case list of
                 Maybe.Nothing ->
                     text "Loading..."
 
-                Maybe.Just movies ->
-                    Table.view config tableState movies
+                Maybe.Just list ->
+                    let
+                        expandedList =
+                            List.filterMap (\movieId -> Dict.get movieId movies) list
+                    in
+                        Table.view config tableState expandedList
             ]
         , div [ id "footer" ]
             [ buildInfoView buildInfo
@@ -161,16 +190,6 @@ maybeIntColumn name accessor =
 
 
 -- HTTP
-
-
-type alias Movie =
-    { id : String
-    , title : String
-    , imdbUrl : String
-    , runTime : Maybe Int
-    , metascore : Maybe Int
-    , imdbRating : Maybe Int
-    }
 
 
 apiUrl : String -> String
