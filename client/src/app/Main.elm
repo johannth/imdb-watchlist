@@ -119,6 +119,7 @@ config =
             [ movieTitleColumn
             , maybeIntColumn "Run Time (min)" .runTime
             , maybeIntColumn "Metascore" .metascore
+            , maybeIntColumn "Imdb Rating" .imdbRating
             ]
         }
 
@@ -168,6 +169,7 @@ type alias Movie =
     , imdbUrl : String
     , runTime : Maybe Int
     , metascore : Maybe Int
+    , imdbRating : Maybe Int
     }
 
 
@@ -194,12 +196,17 @@ decodeWatchlistDataIntoRows =
 
 decodeWatchlistRowIntoMovie : Decode.Decoder Movie
 decodeWatchlistRowIntoMovie =
-    Decode.map5 Movie
-        (Decode.at [ "id" ] Decode.string)
-        (Decode.at [ "primary", "title" ] Decode.string)
-        decodeImdbUrl
-        decodeMovieRunTime
-        (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
+    let
+        normalizeImdbRating rating =
+            round (rating * 10)
+    in
+        Decode.map6 Movie
+            (Decode.at [ "id" ] Decode.string)
+            (Decode.at [ "primary", "title" ] Decode.string)
+            decodeImdbUrl
+            decodeMovieRunTime
+            (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
+            (Decode.maybe (Decode.map normalizeImdbRating (Decode.at [ "ratings", "rating" ] Decode.float)))
 
 
 decodeImdbUrl : Decode.Decoder String
