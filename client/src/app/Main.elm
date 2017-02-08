@@ -117,7 +117,8 @@ config =
         , toMsg = SetTableState
         , columns =
             [ movieTitleColumn
-            , movieRunTimeColumn
+            , maybeIntColumn "Run Time (min)" .runTime
+            , maybeIntColumn "Metascore" .metascore
             ]
         }
 
@@ -141,19 +142,19 @@ movieTitleCell { title, imdbUrl } =
     Table.HtmlDetails [] [ a [ href imdbUrl, target "_blank" ] [ text title ] ]
 
 
-movieRunTimeColumn : Table.Column Movie Msg
-movieRunTimeColumn =
+maybeIntColumn : String -> (Movie -> Maybe Int) -> Table.Column Movie Msg
+maybeIntColumn name accessor =
     let
-        extractRunTimeWithDefault movie =
-            Maybe.withDefault 0 movie.runTime
+        extractWithDefault movie =
+            Maybe.withDefault 0 (accessor (movie))
 
-        runTimeToString movie =
-            Maybe.withDefault "?" (Maybe.map toString movie.runTime)
+        valueToString movie =
+            Maybe.withDefault "?" (Maybe.map toString (accessor (movie)))
     in
         Table.customColumn
-            { name = "Run Time"
-            , viewData = runTimeToString
-            , sorter = Table.increasingOrDecreasingBy extractRunTimeWithDefault
+            { name = name
+            , viewData = valueToString
+            , sorter = Table.increasingOrDecreasingBy extractWithDefault
             }
 
 
@@ -166,6 +167,7 @@ type alias Movie =
     , title : String
     , imdbUrl : String
     , runTime : Maybe Int
+    , metascore : Maybe Int
     }
 
 
@@ -192,11 +194,12 @@ decodeWatchlistDataIntoRows =
 
 decodeWatchlistRowIntoMovie : Decode.Decoder Movie
 decodeWatchlistRowIntoMovie =
-    Decode.map4 Movie
+    Decode.map5 Movie
         (Decode.at [ "id" ] Decode.string)
         (Decode.at [ "primary", "title" ] Decode.string)
         decodeImdbUrl
         decodeMovieRunTime
+        (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
 
 
 decodeImdbUrl : Decode.Decoder String
