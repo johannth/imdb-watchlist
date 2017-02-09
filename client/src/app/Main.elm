@@ -40,6 +40,7 @@ type alias Movie =
     , runTime : Maybe Int
     , metascore : Maybe Int
     , imdbRating : Maybe Int
+    , bechdelRating : Maybe BechdelRating
     }
 
 
@@ -47,6 +48,12 @@ type alias BuildInfo =
     { version : String
     , time : String
     , tier : String
+    }
+
+
+type alias BechdelRating =
+    { rating : Int
+    , dubious : Bool
     }
 
 
@@ -79,6 +86,7 @@ init flags =
 
 type Msg
     = LoadWatchList (Result Http.Error (List Movie))
+    | LoadBechdel String (Result Http.Error (Maybe BechdelRating))
     | SetTableState Table.State
 
 
@@ -104,8 +112,36 @@ update msg model =
                     Dict.fromList (List.map (combine .id identity) watchListMovies)
             in
                 ( { model | list = Maybe.Just list, movies = Dict.union newMovies model.movies }
-                , Cmd.none
+                , Cmd.batch (List.map getBechdelData list)
                 )
+
+        LoadBechdel imdbId (Err error) ->
+            ( model
+            , Cmd.none
+            )
+
+        LoadBechdel imdbId (Ok bechdelRating) ->
+            let
+                movie =
+                    Dict.get imdbId model.movies
+            in
+                case movie of
+                    Maybe.Just movie ->
+                        let
+                            movieWithBechdelRating =
+                                { movie | bechdelRating = bechdelRating }
+
+                            newMovies =
+                                Dict.insert imdbId movieWithBechdelRating model.movies
+                        in
+                            ( { model | movies = newMovies }
+                            , Cmd.none
+                            )
+
+                    Maybe.Nothing ->
+                        ( model
+                        , Cmd.none
+                        )
 
         SetTableState newState ->
             ( { model | tableState = newState }
@@ -149,6 +185,7 @@ config =
             , maybeIntColumn "Run Time (min)" .runTime
             , maybeIntColumn "Metascore" .metascore
             , maybeIntColumn "Imdb Rating" .imdbRating
+            , maybeIntColumn "Bechdel" (\movie -> Maybe.map .rating movie.bechdelRating)
             ]
         }
 
@@ -176,7 +213,7 @@ maybeIntColumn : String -> (Movie -> Maybe Int) -> Table.Column Movie Msg
 maybeIntColumn name accessor =
     let
         extractWithDefault movie =
-            Maybe.withDefault 0 (accessor (movie))
+            Maybe.withDefault -1 (accessor (movie))
 
         valueToString movie =
             Maybe.withDefault "?" (Maybe.map toString (accessor (movie)))
@@ -205,11 +242,6 @@ getWatchlistData userId =
 
 decodeWatchlist : Decode.Decoder (List Movie)
 decodeWatchlist =
-    decodeWatchlistDataIntoRows
-
-
-decodeWatchlistDataIntoRows : Decode.Decoder (List Movie)
-decodeWatchlistDataIntoRows =
     Decode.at [ "list", "movies" ] (Decode.list decodeWatchlistRowIntoMovie)
 
 
@@ -219,13 +251,14 @@ decodeWatchlistRowIntoMovie =
         normalizeImdbRating rating =
             round (rating * 10)
     in
-        Decode.map6 Movie
+        Decode.map7 Movie
             (Decode.at [ "id" ] Decode.string)
             (Decode.at [ "primary", "title" ] Decode.string)
             decodeImdbUrl
             decodeMovieRunTime
             (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
             (Decode.maybe (Decode.map normalizeImdbRating (Decode.at [ "ratings", "rating" ] Decode.float)))
+            (Decode.succeed Maybe.Nothing)
 
 
 decodeImdbUrl : Decode.Decoder String
@@ -248,6 +281,48 @@ calculateMovieRunTime maybeRunTime maybeNumberOfEpisodes =
             Maybe.withDefault 1 maybeNumberOfEpisodes
     in
         Maybe.map (\runTime -> (runTime * numberOfEpisodes) // 60) maybeRunTime
+
+
+
+-- BECHDEL
+
+
+getBechdelData : String -> Cmd Msg
+getBechdelData imdbId =
+    Http.send (LoadBechdel imdbId) <|
+        Http.get (apiUrl ("/api/bechdel?imdbId=" ++ imdbId)) decodeBechdel
+
+
+decodeBechdel : Decode.Decoder (Maybe BechdelRating)
+decodeBechdel =
+    Decode.maybe
+        (Decode.map2 BechdelRating
+            (Decode.at [ "data", "rating" ] (Decode.string |> Decode.andThen decodeIntFromString))
+            (Decode.at [ "data", "dubious" ] (Decode.string |> Decode.andThen decodeBoolFromInt))
+        )
+
+
+decodeIntFromString : String -> Decode.Decoder Int
+decodeIntFromString value =
+    case String.toInt value of
+        Ok valueAsInt ->
+            Decode.succeed valueAsInt
+
+        Err message ->
+            Decode.fail message
+
+
+decodeBoolFromInt : String -> Decode.Decoder Bool
+decodeBoolFromInt value =
+    case value of
+        "0" ->
+            Decode.succeed False
+
+        "1" ->
+            Decode.succeed True
+
+        _ ->
+            Decode.fail ("Unable to decode Bool from value: " ++ (toString value))
 
 
 

@@ -130,16 +130,17 @@ const bechdelCacheKey = imdbId => {
   return `bechdel:${imdbId}`;
 };
 
-app.post('/api/bechdel', (req, res) => {
-  cache.get(bechdelCacheKey(req.body.imdbId)).then(cacheEntry => {
+app.get('/api/bechdel', (req, res) => {
+  const imdbId = req.query.imdbId;
+  cache.get(bechdelCacheKey(imdbId)).then(cacheEntry => {
     const cachedResponse = getJsonFromCachedEntry(cacheEntry);
     if (cachedResponse) {
-      console.log(`Serving from cache ${req.body.imdbId}`);
+      console.log(`Serving from cache ${imdbId}`);
       res.json(cachedResponse);
       return;
     }
 
-    const imdbIdWithoutPrefix = req.body.imdbId.replace('tt', '');
+    const imdbIdWithoutPrefix = imdbId.replace('tt', '');
     const url = `http://bechdeltest.com/api/v1/getMovieByImdbId?imdbid=${imdbIdWithoutPrefix}`;
 
     fetch(url, {
@@ -160,10 +161,10 @@ app.post('/api/bechdel', (req, res) => {
         return json;
       })
       .then(json => {
-        const response = { item: json };
+        const response = { data: json };
 
         cache
-          .set(bechdelCacheKey(req.body.imdbId), saveJsonInCache(response))
+          .set(bechdelCacheKey(imdbId), saveJsonInCache(response))
           .then(() => {
             res.json(response);
           });
