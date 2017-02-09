@@ -74,11 +74,14 @@ const handleErrors = response => {
   return response;
 };
 
-app.post('/api/justwatch', (req, res) => {
-  cache.get(justwatchCacheKey(req.body.imdbId)).then(cacheEntry => {
+app.get('/api/justwatch', (req, res) => {
+  const imdbId = req.query.imdbId;
+  const title = req.query.title;
+
+  cache.get(justwatchCacheKey(imdbId)).then(cacheEntry => {
     const cachedResponse = getJsonFromCachedEntry(cacheEntry);
     if (cachedResponse) {
-      console.log(`Serving from cache ${req.body.imdbId}`);
+      console.log(`Serving from cache ${imdbId}`);
       res.json(cachedResponse);
       return;
     }
@@ -87,7 +90,7 @@ app.post('/api/justwatch', (req, res) => {
       method: 'POST',
       body: JSON.stringify({
         content_types: [ 'show', 'movie' ],
-        query: req.body.title
+        query: title
       }),
       headers: {
         Accept: 'application/json, text/plain, */*',
@@ -101,15 +104,15 @@ app.post('/api/justwatch', (req, res) => {
       .then(json => {
         const possibleItem = json.items && json.items[0];
 
-        if (!possibleItem || possibleItem.title !== req.body.title) {
-          res.json({ item: null });
+        if (!possibleItem || possibleItem.title !== title) {
+          res.json({ data: null });
           return;
         }
 
         const item = possibleItem;
 
         const response = {
-          item: {
+          data: {
             id: item.id,
             href: `https://www.justwatch.com${item.full_path}`,
             offers: item.offers,
@@ -118,7 +121,7 @@ app.post('/api/justwatch', (req, res) => {
         };
 
         cache
-          .set(justwatchCacheKey(req.body.imdbId), saveJsonInCache(response))
+          .set(justwatchCacheKey(imdbId), saveJsonInCache(response))
           .then(() => {
             res.json(response);
           });

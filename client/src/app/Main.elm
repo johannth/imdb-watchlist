@@ -33,14 +33,29 @@ main =
 -- MODEL
 
 
-type alias Movie =
+type alias WatchListMovie =
     { id : String
     , title : String
     , imdbUrl : String
     , runTime : Maybe Int
     , metascore : Maybe Int
     , imdbRating : Maybe Int
+    }
+
+
+type alias Movie =
+    { id : String
+    , title : String
+    , imdbUrl : String
+    , runTime : Maybe Int
+    , metascore : Maybe Int
+    , rottenTomatoesMeter : Maybe Int
+    , imdbRating : Maybe Int
     , bechdelRating : Maybe BechdelRating
+    , netflixUrl : Maybe String
+    , hboUrl : Maybe String
+    , itunesUrl : Maybe String
+    , amazonUrl : Maybe String
     }
 
 
@@ -48,6 +63,62 @@ type alias BuildInfo =
     { version : String
     , time : String
     , tier : String
+    }
+
+
+type JustWatchPresentationType
+    = SD
+    | HD
+
+
+type JustWatchProvider
+    = Amazon
+    | ITunes
+    | Netflix
+    | HBO
+
+
+type JustWatchOffer
+    = Rent JustWatchProvider String JustWatchPresentationType Float
+    | Buy JustWatchProvider String JustWatchPresentationType Float
+    | Flatrate JustWatchProvider String JustWatchPresentationType
+
+
+type alias JustWatchScore =
+    { providerType : String
+    , value : Float
+    }
+
+
+providerFromOffer : JustWatchOffer -> JustWatchProvider
+providerFromOffer offer =
+    case offer of
+        Flatrate provider _ _ ->
+            provider
+
+        Rent provider _ _ _ ->
+            provider
+
+        Buy provider _ _ _ ->
+            provider
+
+
+urlFromOffer : JustWatchOffer -> String
+urlFromOffer offer =
+    case offer of
+        Flatrate _ url _ ->
+            url
+
+        Rent _ url _ _ ->
+            url
+
+        Buy _ url _ _ ->
+            url
+
+
+type alias JustWatchData =
+    { offers : List JustWatchOffer
+    , scores : List JustWatchScore
     }
 
 
@@ -85,14 +156,32 @@ init flags =
 
 
 type Msg
-    = LoadWatchList (Result Http.Error (List Movie))
+    = LoadWatchList (Result Http.Error (List WatchListMovie))
     | LoadBechdel String (Result Http.Error (Maybe BechdelRating))
+    | LoadJustWatch String (Result Http.Error (Maybe JustWatchData))
     | SetTableState Table.State
 
 
 combine : (a -> b) -> (a -> c) -> (a -> ( b, c ))
 combine f g =
     \x -> ( f (x), g (x) )
+
+
+watchListMovieToMovie : WatchListMovie -> Movie
+watchListMovieToMovie watchListMovie =
+    { id = watchListMovie.id
+    , title = watchListMovie.title
+    , imdbUrl = watchListMovie.imdbUrl
+    , runTime = watchListMovie.runTime
+    , metascore = watchListMovie.metascore
+    , rottenTomatoesMeter = Maybe.Nothing
+    , imdbRating = watchListMovie.imdbRating
+    , bechdelRating = Maybe.Nothing
+    , netflixUrl = Maybe.Nothing
+    , hboUrl = Maybe.Nothing
+    , itunesUrl = Maybe.Nothing
+    , amazonUrl = Maybe.Nothing
+    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -109,10 +198,17 @@ update msg model =
                     List.map .id watchListMovies
 
                 newMovies =
-                    Dict.fromList (List.map (combine .id identity) watchListMovies)
+                    Dict.fromList (List.map (combine .id watchListMovieToMovie) watchListMovies)
+
+                bechdelCommands =
+                    List.map getBechdelData list
+
+                justWatchCommands =
+                    List.map (\movie -> getJustWatchData movie.id movie.title) watchListMovies
             in
                 ( { model | list = Maybe.Just list, movies = Dict.union newMovies model.movies }
-                , Cmd.batch (List.map getBechdelData list)
+                  -- We probably eventually want to merge the data here, or simply store it separately
+                , Cmd.batch (List.append justWatchCommands bechdelCommands)
                 )
 
         LoadBechdel imdbId (Err error) ->
@@ -143,10 +239,86 @@ update msg model =
                         , Cmd.none
                         )
 
+        LoadJustWatch imdbId (Err error) ->
+            ( model
+            , Cmd.none
+            )
+
+        LoadJustWatch imdbId (Ok justWatchData) ->
+            let
+                movie =
+                    Dict.get imdbId model.movies
+            in
+                case ( movie, justWatchData ) of
+                    ( Maybe.Just movie, Maybe.Just justWatchData ) ->
+                        let
+                            updatedMovie =
+                                { movie
+                                    | rottenTomatoesMeter = Maybe.map round (extractScore "tomato:meter" justWatchData.scores)
+                                    , netflixUrl = Maybe.map urlFromOffer (extractBestOffer Netflix justWatchData.offers)
+                                    , hboUrl = Maybe.map urlFromOffer (extractBestOffer HBO justWatchData.offers)
+                                    , amazonUrl = Maybe.map urlFromOffer (extractBestOffer Amazon justWatchData.offers)
+                                    , itunesUrl = Maybe.map urlFromOffer (extractBestOffer ITunes justWatchData.offers)
+                                }
+
+                            newMovies =
+                                Dict.insert imdbId updatedMovie model.movies
+                        in
+                            ( { model | movies = newMovies }
+                            , Cmd.none
+                              -- TODO: Verify netflix url
+                            )
+
+                    _ ->
+                        ( model
+                        , Cmd.none
+                        )
+
         SetTableState newState ->
             ( { model | tableState = newState }
             , Cmd.none
             )
+
+
+offerOrdinal : JustWatchOffer -> ( Int, Int, Float )
+offerOrdinal offer =
+    let
+        presentationTypeOrdinal presentationType =
+            case presentationType of
+                SD ->
+                    0
+
+                HD ->
+                    1
+    in
+        case offer of
+            Flatrate _ _ presentationType ->
+                ( 2, presentationTypeOrdinal presentationType, 0 )
+
+            Rent _ _ presentationType price ->
+                ( 1, presentationTypeOrdinal presentationType, price )
+
+            Buy _ _ presentationType price ->
+                ( 0, presentationTypeOrdinal presentationType, price )
+
+
+offerOrder : JustWatchOffer -> JustWatchOffer -> Order
+offerOrder offerA offerB =
+    compare (offerOrdinal offerA) (offerOrdinal offerB)
+
+
+extractBestOffer : JustWatchProvider -> List JustWatchOffer -> Maybe JustWatchOffer
+extractBestOffer provider offers =
+    List.filter (\o -> (providerFromOffer o) == provider) offers
+        |> List.sortWith offerOrder
+        |> List.head
+
+
+extractScore : String -> List JustWatchScore -> Maybe Float
+extractScore provider scores =
+    List.filter (\s -> s.providerType == provider) scores
+        |> List.head
+        |> Maybe.map .value
 
 
 
@@ -184,8 +356,13 @@ config =
             [ movieTitleColumn
             , maybeIntColumn "Run Time (min)" .runTime
             , maybeIntColumn "Metascore" .metascore
+            , maybeIntColumn "Tomatometer" .rottenTomatoesMeter
             , maybeIntColumn "Imdb Rating" .imdbRating
             , maybeIntColumn "Bechdel" (\movie -> Maybe.map .rating movie.bechdelRating)
+            , streamColumn "Netflix" .netflixUrl
+            , streamColumn "HBO" .hboUrl
+            , streamColumn "Amazon" .amazonUrl
+            , streamColumn "iTunes" .itunesUrl
             ]
         }
 
@@ -199,24 +376,40 @@ movieTitleColumn : Table.Column Movie Msg
 movieTitleColumn =
     Table.veryCustomColumn
         { name = "Title"
-        , viewData = movieTitleCell
+        , viewData = \movie -> linkCell movie.title (Maybe.Just movie.imdbUrl)
         , sorter = Table.increasingOrDecreasingBy .title
         }
 
 
-movieTitleCell : Movie -> Table.HtmlDetails Msg
-movieTitleCell { title, imdbUrl } =
-    Table.HtmlDetails [] [ a [ href imdbUrl, target "_blank" ] [ text title ] ]
+streamColumn : String -> (Movie -> Maybe String) -> Table.Column Movie Msg
+streamColumn name accessor =
+    Table.veryCustomColumn
+        { name = name
+        , viewData = \movie -> linkCell "X" (accessor movie)
+        , sorter = Table.increasingBy (\movie -> Maybe.withDefault "" (accessor movie))
+        }
+
+
+linkCell : String -> Maybe String -> Table.HtmlDetails Msg
+linkCell title url =
+    Table.HtmlDetails []
+        [ case url of
+            Maybe.Just url ->
+                a [ href url, target "_blank" ] [ text title ]
+
+            Maybe.Nothing ->
+                span [] []
+        ]
 
 
 maybeIntColumn : String -> (Movie -> Maybe Int) -> Table.Column Movie Msg
 maybeIntColumn name accessor =
     let
         extractWithDefault movie =
-            Maybe.withDefault -1 (accessor (movie))
+            Maybe.withDefault -1 (accessor movie)
 
         valueToString movie =
-            Maybe.withDefault "?" (Maybe.map toString (accessor (movie)))
+            Maybe.withDefault "?" (Maybe.map toString (accessor movie))
     in
         Table.customColumn
             { name = name
@@ -240,25 +433,24 @@ getWatchlistData userId =
         Http.get (apiUrl ("/api/watchlist?userId=" ++ userId)) decodeWatchlist
 
 
-decodeWatchlist : Decode.Decoder (List Movie)
+decodeWatchlist : Decode.Decoder (List WatchListMovie)
 decodeWatchlist =
     Decode.at [ "list", "movies" ] (Decode.list decodeWatchlistRowIntoMovie)
 
 
-decodeWatchlistRowIntoMovie : Decode.Decoder Movie
+decodeWatchlistRowIntoMovie : Decode.Decoder WatchListMovie
 decodeWatchlistRowIntoMovie =
     let
         normalizeImdbRating rating =
             round (rating * 10)
     in
-        Decode.map7 Movie
+        Decode.map6 WatchListMovie
             (Decode.at [ "id" ] Decode.string)
             (Decode.at [ "primary", "title" ] Decode.string)
             decodeImdbUrl
             decodeMovieRunTime
             (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
             (Decode.maybe (Decode.map normalizeImdbRating (Decode.at [ "ratings", "rating" ] Decode.float)))
-            (Decode.succeed Maybe.Nothing)
 
 
 decodeImdbUrl : Decode.Decoder String
@@ -323,6 +515,90 @@ decodeBoolFromInt value =
 
         _ ->
             Decode.fail ("Unable to decode Bool from value: " ++ (toString value))
+
+
+
+-- JUSTWATCH
+
+
+getJustWatchData : String -> String -> Cmd Msg
+getJustWatchData imdbId title =
+    Http.send (LoadJustWatch imdbId) <|
+        Http.get (apiUrl ("/api/justwatch?imdbId=" ++ imdbId ++ "&title=" ++ title)) decodeJustWatchData
+
+
+decodeJustWatchData : Decode.Decoder (Maybe JustWatchData)
+decodeJustWatchData =
+    Decode.maybe
+        (Decode.map2 JustWatchData
+            (Decode.at [ "data", "offers" ] (Decode.map (List.filterMap identity) (Decode.list decodeOffer)))
+            (Decode.at [ "data", "scoring" ] (Decode.list decodeJustWatchScore))
+        )
+
+
+decodeOffer : Decode.Decoder (Maybe JustWatchOffer)
+decodeOffer =
+    Decode.map5 convertOfferJsonToType
+        (Decode.at [ "monetization_type" ] Decode.string)
+        (Decode.at [ "provider_id" ] Decode.int)
+        (Decode.at [ "urls", "standard_web" ] Decode.string)
+        (Decode.at [ "presentation_type" ] Decode.string)
+        (Decode.maybe (Decode.at [ "retail_price" ] Decode.float))
+
+
+convertOfferJsonToType : String -> Int -> String -> String -> Maybe Float -> Maybe JustWatchOffer
+convertOfferJsonToType monetizationType providerId url presentationType maybePrice =
+    case ( monetizationType, (convertProviderId providerId), (convertPresentationType presentationType), maybePrice ) of
+        ( "flatrate", Maybe.Just provider, Maybe.Just presentationType, _ ) ->
+            Maybe.Just (Flatrate provider url presentationType)
+
+        ( "buy", Maybe.Just provider, Maybe.Just presentationType, Maybe.Just price ) ->
+            Maybe.Just (Buy provider url presentationType price)
+
+        ( "rent", Maybe.Just provider, Maybe.Just presentationType, Maybe.Just price ) ->
+            Maybe.Just (Rent provider url presentationType price)
+
+        _ ->
+            Maybe.Nothing
+
+
+convertProviderId : Int -> Maybe JustWatchProvider
+convertProviderId providerId =
+    case providerId of
+        2 ->
+            Maybe.Just ITunes
+
+        8 ->
+            Maybe.Just Netflix
+
+        10 ->
+            Maybe.Just Amazon
+
+        27 ->
+            Maybe.Just HBO
+
+        _ ->
+            Maybe.Nothing
+
+
+convertPresentationType : String -> Maybe JustWatchPresentationType
+convertPresentationType presentationType =
+    case presentationType of
+        "hd" ->
+            Maybe.Just HD
+
+        "sd" ->
+            Maybe.Just SD
+
+        _ ->
+            Maybe.Nothing
+
+
+decodeJustWatchScore : Decode.Decoder JustWatchScore
+decodeJustWatchScore =
+    Decode.map2 JustWatchScore
+        (Decode.field "provider_type" Decode.string)
+        (Decode.field "value" Decode.float)
 
 
 
