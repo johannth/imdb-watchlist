@@ -49,10 +49,10 @@ type alias Movie =
     , rottenTomatoesMeter : Maybe Int
     , imdbRating : Maybe Int
     , bechdelRating : Maybe BechdelRating
-    , netflixUrl : Maybe String
-    , hboUrl : Maybe String
-    , itunesUrl : Maybe String
-    , amazonUrl : Maybe String
+    , netflix : Maybe JustWatchOffer
+    , hbo : Maybe JustWatchOffer
+    , itunes : Maybe JustWatchOffer
+    , amazon : Maybe JustWatchOffer
     }
 
 
@@ -66,10 +66,10 @@ watchListMovieToMovie watchListMovie =
     , rottenTomatoesMeter = Maybe.Nothing
     , imdbRating = watchListMovie.imdbRating
     , bechdelRating = Maybe.Nothing
-    , netflixUrl = Maybe.Nothing
-    , hboUrl = Maybe.Nothing
-    , itunesUrl = Maybe.Nothing
-    , amazonUrl = Maybe.Nothing
+    , netflix = Maybe.Nothing
+    , hbo = Maybe.Nothing
+    , itunes = Maybe.Nothing
+    , amazon = Maybe.Nothing
     }
 
 
@@ -143,6 +143,19 @@ urlFromOffer offer =
 
         Buy _ url _ _ ->
             url
+
+
+updateUrl : String -> JustWatchOffer -> JustWatchOffer
+updateUrl url offer =
+    case offer of
+        Flatrate provider _ presentationType ->
+            Flatrate provider url presentationType
+
+        Rent provider _ presentationType price ->
+            Rent provider url presentationType price
+
+        Buy provider _ presentationType price ->
+            Rent provider url presentationType price
 
 
 type alias JustWatchData =

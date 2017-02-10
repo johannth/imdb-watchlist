@@ -42,10 +42,10 @@ config =
             , maybeIntColumn "Tomatometer" .rottenTomatoesMeter
             , maybeIntColumn "Imdb Rating" .imdbRating
             , maybeIntColumn "Bechdel" (\movie -> Maybe.map .rating movie.bechdelRating)
-            , streamColumn "Netflix" .netflixUrl
-            , streamColumn "HBO" .hboUrl
-            , streamColumn "Amazon" .amazonUrl
-            , streamColumn "iTunes" .itunesUrl
+            , streamColumn "Netflix" .netflix
+            , streamColumn "HBO" .hbo
+            , streamColumn "Amazon" .amazon
+            , streamColumn "iTunes" .itunes
             , priorityColumn
             ]
         }
@@ -60,29 +60,40 @@ movieTitleColumn : Table.Column Movie Msg
 movieTitleColumn =
     Table.veryCustomColumn
         { name = "Title"
-        , viewData = \movie -> linkCell movie.title (Just movie.imdbUrl)
+        , viewData = \movie -> linkCell movie.title movie.imdbUrl
         , sorter = Table.increasingOrDecreasingBy .title
         }
 
 
-streamColumn : String -> (Movie -> Maybe String) -> Table.Column Movie Msg
+cellForOffer : Maybe JustWatchOffer -> Table.HtmlDetails Msg
+cellForOffer offer =
+    case offer of
+        Just (Flatrate _ url _) ->
+            linkCell "Free" url
+
+        Just (Buy _ url _ price) ->
+            linkCell ("$" ++ (toString price)) url
+
+        Just (Rent _ url _ price) ->
+            linkCell ("$" ++ (toString price)) url
+
+        Nothing ->
+            Table.HtmlDetails [] []
+
+
+streamColumn : String -> (Movie -> Maybe JustWatchOffer) -> Table.Column Movie Msg
 streamColumn name accessor =
     Table.veryCustomColumn
         { name = name
-        , viewData = \movie -> linkCell "X" (accessor movie)
-        , sorter = Table.increasingBy (\movie -> Maybe.withDefault "" (accessor movie))
+        , viewData = cellForOffer << accessor
+        , sorter = Table.unsortable
         }
 
 
-linkCell : String -> Maybe String -> Table.HtmlDetails Msg
+linkCell : String -> String -> Table.HtmlDetails Msg
 linkCell title url =
     Table.HtmlDetails []
-        [ case url of
-            Just url ->
-                a [ href url, target "_blank" ] [ text title ]
-
-            Nothing ->
-                span [] []
+        [ a [ href url, target "_blank" ] [ text title ]
         ]
 
 

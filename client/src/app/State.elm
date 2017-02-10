@@ -3,6 +3,7 @@ module State exposing (init, update, calculatePriority)
 import Dict
 import Api
 import Types exposing (..)
+import Utils
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -10,21 +11,6 @@ init flags =
     ( emptyModel flags
     , Api.getWatchlistData "ur10614064"
     )
-
-
-lift2 : (a -> b) -> (a -> c) -> (a -> ( b, c ))
-lift2 f g =
-    \x -> ( f x, g x )
-
-
-maybeHasValue : Maybe a -> Bool
-maybeHasValue maybeValue =
-    case maybeValue of
-        Just _ ->
-            True
-
-        Nothing ->
-            False
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -39,7 +25,7 @@ update msg model =
                     List.map .id watchListMovies
 
                 newMovies =
-                    List.map (lift2 .id watchListMovieToMovie) watchListMovies
+                    List.map (Utils.lift2 .id watchListMovieToMovie) watchListMovies
                         |> Dict.fromList
 
                 bechdelCommands =
@@ -79,19 +65,19 @@ update msg model =
                         updatedMovie =
                             { movie
                                 | rottenTomatoesMeter = Maybe.map round (extractScore "tomato:meter" justWatchData.scores)
-                                , netflixUrl = Maybe.map urlFromOffer (extractBestOffer Netflix justWatchData.offers)
-                                , hboUrl = Maybe.map urlFromOffer (extractBestOffer HBO justWatchData.offers)
-                                , amazonUrl = Maybe.map urlFromOffer (extractBestOffer Amazon justWatchData.offers)
-                                , itunesUrl = Maybe.map urlFromOffer (extractBestOffer ITunes justWatchData.offers)
+                                , netflix = extractBestOffer Netflix justWatchData.offers
+                                , hbo = extractBestOffer HBO justWatchData.offers
+                                , amazon = extractBestOffer Amazon justWatchData.offers
+                                , itunes = extractBestOffer ITunes justWatchData.offers
                             }
 
                         newMovies =
                             Dict.insert imdbId updatedMovie model.movies
                     in
                         { model | movies = newMovies }
-                            ! case updatedMovie.netflixUrl of
-                                Just netflixUrl ->
-                                    [ Api.getConfirmNetflixData imdbId netflixUrl ]
+                            ! case updatedMovie.netflix of
+                                Just netflixOffer ->
+                                    [ Api.getConfirmNetflixData imdbId (urlFromOffer netflixOffer) ]
 
                                 Nothing ->
                                     []
@@ -107,7 +93,15 @@ update msg model =
                 Just movie ->
                     let
                         updatedMovie =
-                            { movie | netflixUrl = maybeNetflixUrl }
+                            { movie
+                                | netflix =
+                                    case maybeNetflixUrl of
+                                        Just netflixUrl ->
+                                            Maybe.map (updateUrl netflixUrl) movie.netflix
+
+                                        Nothing ->
+                                            Maybe.Nothing
+                            }
                     in
                         { model | movies = Dict.insert imdbId updatedMovie model.movies } ! []
 
@@ -136,20 +130,20 @@ offerOrdinal offer =
         presentationTypeOrdinal presentationType =
             case presentationType of
                 SD ->
-                    0
+                    1
 
                 HD ->
-                    1
+                    0
     in
         case offer of
             Flatrate _ _ presentationType ->
-                ( 2, presentationTypeOrdinal presentationType, 0 )
+                ( 0, presentationTypeOrdinal presentationType, 0 )
 
             Rent _ _ presentationType price ->
                 ( 1, presentationTypeOrdinal presentationType, price )
 
             Buy _ _ presentationType price ->
-                ( 0, presentationTypeOrdinal presentationType, price )
+                ( 2, presentationTypeOrdinal presentationType, price )
 
 
 extractScore : String -> List JustWatchScore -> Maybe Float
@@ -161,9 +155,9 @@ extractScore provider scores =
 
 calculateStreamabilityWeight : Movie -> Float
 calculateStreamabilityWeight movie =
-    if List.any maybeHasValue [ movie.netflixUrl, movie.hboUrl, movie.amazonUrl ] then
+    if List.any Utils.maybeHasValue [ movie.netflix, movie.hbo ] then
         1
-    else if maybeHasValue movie.itunesUrl then
+    else if List.any Utils.maybeHasValue [ movie.itunes, movie.amazon ] then
         0.9
     else
         0.1
