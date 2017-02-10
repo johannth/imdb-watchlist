@@ -5,6 +5,7 @@ import Html.Attributes exposing (..)
 import Table
 import Dict
 import Types exposing (..)
+import State
 
 
 rootView : Model -> Html Msg
@@ -101,74 +102,10 @@ maybeIntColumn name accessor =
             }
 
 
-maybeHasValue : Maybe a -> Bool
-maybeHasValue maybeValue =
-    case maybeValue of
-        Just _ ->
-            True
-
-        Nothing ->
-            False
-
-
-calculateStreamabilityWeight : Movie -> Float
-calculateStreamabilityWeight movie =
-    if List.any maybeHasValue [ movie.netflixUrl, movie.hboUrl, movie.amazonUrl ] then
-        1
-    else if maybeHasValue movie.itunesUrl then
-        0.9
-    else
-        0.1
-
-
-calculatePriority : Movie -> Float
-calculatePriority movie =
-    let
-        extractValueToFloat maybeInt =
-            Maybe.withDefault 50 (Maybe.map toFloat maybeInt)
-
-        streamabilityWeight =
-            calculateStreamabilityWeight movie
-
-        runTimeWeight =
-            1 / 5
-
-        normalizedRunTime =
-            90 * (1 / (extractValueToFloat movie.runTime + 90))
-
-        metascoreWeight =
-            1 / 5
-
-        tomatoMeterWeight =
-            1 / 5
-
-        imdbRatingWeight =
-            1 / 5
-
-        bechdelWeight =
-            1 / 5
-
-        normalizedBechdel =
-            extractValueToFloat (Maybe.map .rating movie.bechdelRating) / 3
-    in
-        streamabilityWeight
-            * (metascoreWeight
-                * (extractValueToFloat movie.metascore)
-                + tomatoMeterWeight
-                * (extractValueToFloat movie.rottenTomatoesMeter)
-                + imdbRatingWeight
-                * (extractValueToFloat movie.imdbRating)
-                + bechdelWeight
-                * normalizedBechdel
-                + runTimeWeight
-                * normalizedRunTime
-              )
-
-
 priorityColumn : Table.Column Movie Msg
 priorityColumn =
     Table.customColumn
         { name = "Priority"
-        , viewData = calculatePriority >> toString
-        , sorter = Table.decreasingOrIncreasingBy calculatePriority
+        , viewData = State.calculatePriority >> toString
+        , sorter = Table.decreasingOrIncreasingBy State.calculatePriority
         }
