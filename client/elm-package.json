@@ -1,8 +1,8 @@
 {
     "version": "0.0.1",
-    "summary": "A simple webapp to browse antibiotics guidelines.",
-    "repository": "https://github.com/johannth/antibiotics-guidelines.git",
-    "license": "BSD3",
+    "summary": "A simple webapp to sort your IMDB watchlist",
+    "repository": "https://github.com/johannth/imdb-watchlist.git",
+    "license": "None",
     "source-directories": [
         "src/app"
     ],

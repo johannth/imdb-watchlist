@@ -1,5 +1,5 @@
 {
-  "name": "impact-list-server",
+  "name": "imdb-watchlist-server",
   "version": "0.1.0",
   "private": true,
   "scripts": {
