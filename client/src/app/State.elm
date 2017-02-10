@@ -17,6 +17,16 @@ lift2 f g =
     \x -> ( f x, g x )
 
 
+maybeHasValue : Maybe a -> Bool
+maybeHasValue maybeValue =
+    case maybeValue of
+        Just _ ->
+            True
+
+        Nothing ->
+            False
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -110,7 +120,7 @@ update msg model =
 
 extractBestOffer : JustWatchProvider -> List JustWatchOffer -> Maybe JustWatchOffer
 extractBestOffer provider offers =
-    List.filter (\o -> (providerFromOffer o) == provider) offers
+    List.filter (\offer -> (providerFromOffer offer) == provider) offers
         |> List.sortWith offerOrder
         |> List.head
 
@@ -144,19 +154,9 @@ offerOrdinal offer =
 
 extractScore : String -> List JustWatchScore -> Maybe Float
 extractScore provider scores =
-    List.filter (\s -> s.providerType == provider) scores
+    List.filter (\score -> score.providerType == provider) scores
         |> List.head
         |> Maybe.map .value
-
-
-maybeHasValue : Maybe a -> Bool
-maybeHasValue maybeValue =
-    case maybeValue of
-        Just _ ->
-            True
-
-        Nothing ->
-            False
 
 
 calculateStreamabilityWeight : Movie -> Float
