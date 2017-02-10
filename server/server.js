@@ -4,15 +4,17 @@ import cheerio from 'cheerio';
 import bodyParser from 'body-parser';
 import Cache from 'async-disk-cache';
 import request from 'request';
+import cors from 'cors';
 
 const app = express();
 
 const cache = new Cache('watchlist');
 
 app.use(bodyParser.json());
+app.use(cors());
 
-app.post('/api/watchlist', (req, res) => {
-  fetch(`http://www.imdb.com/user/${req.body.userId}/watchlist?view=detail`)
+app.get('/api/watchlist', (req, res) => {
+  fetch(`http://www.imdb.com/user/${req.query.userId}/watchlist?view=detail`)
     .then(response => response.text())
     .then(text => {
       const initialStateRegex = /IMDbReactInitialState\.push\((\{.+\})\);/g;
@@ -72,11 +74,14 @@ const handleErrors = response => {
   return response;
 };
 
-app.post('/api/justwatch', (req, res) => {
-  cache.get(justwatchCacheKey(req.body.imdbId)).then(cacheEntry => {
+app.get('/api/justwatch', (req, res) => {
+  const imdbId = req.query.imdbId;
+  const title = req.query.title;
+
+  cache.get(justwatchCacheKey(imdbId)).then(cacheEntry => {
     const cachedResponse = getJsonFromCachedEntry(cacheEntry);
     if (cachedResponse) {
-      console.log(`Serving from cache ${req.body.imdbId}`);
+      console.log(`/api/justwatch: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
       return;
     }
@@ -85,7 +90,7 @@ app.post('/api/justwatch', (req, res) => {
       method: 'POST',
       body: JSON.stringify({
         content_types: [ 'show', 'movie' ],
-        query: req.body.title
+        query: title
       }),
       headers: {
         Accept: 'application/json, text/plain, */*',
@@ -99,15 +104,15 @@ app.post('/api/justwatch', (req, res) => {
       .then(json => {
         const possibleItem = json.items && json.items[0];
 
-        if (!possibleItem || possibleItem.title !== req.body.title) {
-          res.json({ item: null });
+        if (!possibleItem || possibleItem.title !== title) {
+          res.json({ data: null });
           return;
         }
 
         const item = possibleItem;
 
         const response = {
-          item: {
+          data: {
             id: item.id,
             href: `https://www.justwatch.com${item.full_path}`,
             offers: item.offers,
@@ -116,7 +121,7 @@ app.post('/api/justwatch', (req, res) => {
         };
 
         cache
-          .set(justwatchCacheKey(req.body.imdbId), saveJsonInCache(response))
+          .set(justwatchCacheKey(imdbId), saveJsonInCache(response))
           .then(() => {
             res.json(response);
           });
@@ -128,16 +133,17 @@ const bechdelCacheKey = imdbId => {
   return `bechdel:${imdbId}`;
 };
 
-app.post('/api/bechdel', (req, res) => {
-  cache.get(bechdelCacheKey(req.body.imdbId)).then(cacheEntry => {
+app.get('/api/bechdel', (req, res) => {
+  const imdbId = req.query.imdbId;
+  cache.get(bechdelCacheKey(imdbId)).then(cacheEntry => {
     const cachedResponse = getJsonFromCachedEntry(cacheEntry);
     if (cachedResponse) {
-      console.log(`Serving from cache ${req.body.imdbId}`);
+      console.log(`/api/bechdel: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
       return;
     }
 
-    const imdbIdWithoutPrefix = req.body.imdbId.replace('tt', '');
+    const imdbIdWithoutPrefix = imdbId.replace('tt', '');
     const url = `http://bechdeltest.com/api/v1/getMovieByImdbId?imdbid=${imdbIdWithoutPrefix}`;
 
     fetch(url, {
@@ -158,10 +164,10 @@ app.post('/api/bechdel', (req, res) => {
         return json;
       })
       .then(json => {
-        const response = { item: json };
+        const response = { data: json };
 
         cache
-          .set(bechdelCacheKey(req.body.imdbId), saveJsonInCache(response))
+          .set(bechdelCacheKey(imdbId), saveJsonInCache(response))
           .then(() => {
             res.json(response);
           });
@@ -177,22 +183,25 @@ const netflixCacheKey = imdbId => {
 // Those won't necessary work on the Icelandic Netflix. The movie
 // seems to have the same ID though so we try to see if a localized
 // url returns 200.
-app.post('/api/netflix', (req, res) => {
-  cache.get(netflixCacheKey(req.body.imdbId)).then(cacheEntry => {
-    if (!req.body.netflix) {
-      res.json({ item: null });
+app.get('/api/netflix', (req, res) => {
+  const imdbId = req.query.imdbId;
+  const netflixUrl = req.query.netflixUrl;
+  const locale = req.query.locale;
+
+  cache.get(netflixCacheKey(imdbId)).then(cacheEntry => {
+    if (!netflixUrl) {
+      res.json({ data: null });
       return;
     }
 
     const cachedResponse = getJsonFromCachedEntry(cacheEntry);
     if (cachedResponse) {
-      console.log(`Serving from cache ${req.body.imdbId}`);
+      console.log(`/api/netflix: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
       return;
     }
 
-    const locale = req.body.locale;
-    const netflixUrlInLocale = req.body.netflix
+    const netflixUrlInLocale = netflixUrl
       .replace('/title/', `/${locale}/title/`)
       .replace('http://', 'https://');
 
@@ -203,11 +212,13 @@ app.post('/api/netflix', (req, res) => {
     ) =>
       {
         const payload = {
-          netflix: response.statusCode == 200 ? netflixUrlInLocale : null
+          data: {
+            netflixUrl: response.statusCode == 200 ? netflixUrlInLocale : null
+          }
         };
 
         cache
-          .set(netflixCacheKey(req.body.imdbId), saveJsonInCache(payload))
+          .set(netflixCacheKey(imdbId), saveJsonInCache(payload))
           .then(() => {
             res.json(payload);
           });

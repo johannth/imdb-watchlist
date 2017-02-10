@@ -1,0 +1,27 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Tahoma, Geneva, sans-serif;
+}
+
+#content {
+  margin: 0 auto;
+}
+
+#title {
+  text-align: center;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #000;
+  margin: 15px 0 10px 0;
+  cursor: pointer;
+}
+
+#footer {
+  border-top: 1px solid black;
+  text-align: center;
+  padding-top: 10px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}

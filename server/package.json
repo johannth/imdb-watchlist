@@ -1,5 +1,5 @@
 {
-  "name": "impact-list-server",
+  "name": "imdb-watchlist-server",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -15,6 +15,7 @@
     "async-disk-cache": "^1.0.9",
     "body-parser": "^1.16.0",
     "cheerio": "^0.22.0",
+    "cors": "^2.8.1",
     "express": "^4.14.1",
     "node-fetch": "^1.6.3",
     "request": "^2.79.0"
