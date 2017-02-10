@@ -81,7 +81,7 @@ app.get('/api/justwatch', (req, res) => {
   cache.get(justwatchCacheKey(imdbId)).then(cacheEntry => {
     const cachedResponse = getJsonFromCachedEntry(cacheEntry);
     if (cachedResponse) {
-      console.log(`Serving from cache ${imdbId}`);
+      console.log(`/api/justwatch: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
       return;
     }
@@ -138,7 +138,7 @@ app.get('/api/bechdel', (req, res) => {
   cache.get(bechdelCacheKey(imdbId)).then(cacheEntry => {
     const cachedResponse = getJsonFromCachedEntry(cacheEntry);
     if (cachedResponse) {
-      console.log(`Serving from cache ${imdbId}`);
+      console.log(`/api/bechdel: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
       return;
     }
@@ -183,22 +183,25 @@ const netflixCacheKey = imdbId => {
 // Those won't necessary work on the Icelandic Netflix. The movie
 // seems to have the same ID though so we try to see if a localized
 // url returns 200.
-app.post('/api/netflix', (req, res) => {
-  cache.get(netflixCacheKey(req.body.imdbId)).then(cacheEntry => {
-    if (!req.body.netflix) {
-      res.json({ item: null });
+app.get('/api/netflix', (req, res) => {
+  const imdbId = req.query.imdbId;
+  const netflixUrl = req.query.netflixUrl;
+  const locale = req.query.locale;
+
+  cache.get(netflixCacheKey(imdbId)).then(cacheEntry => {
+    if (!netflixUrl) {
+      res.json({ data: null });
       return;
     }
 
     const cachedResponse = getJsonFromCachedEntry(cacheEntry);
     if (cachedResponse) {
-      console.log(`Serving from cache ${req.body.imdbId}`);
+      console.log(`/api/netflix: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
       return;
     }
 
-    const locale = req.body.locale;
-    const netflixUrlInLocale = req.body.netflix
+    const netflixUrlInLocale = netflixUrl
       .replace('/title/', `/${locale}/title/`)
       .replace('http://', 'https://');
 
@@ -209,11 +212,13 @@ app.post('/api/netflix', (req, res) => {
     ) =>
       {
         const payload = {
-          netflix: response.statusCode == 200 ? netflixUrlInLocale : null
+          data: {
+            netflixUrl: response.statusCode == 200 ? netflixUrlInLocale : null
+          }
         };
 
         cache
-          .set(netflixCacheKey(req.body.imdbId), saveJsonInCache(payload))
+          .set(netflixCacheKey(imdbId), saveJsonInCache(payload))
           .then(() => {
             res.json(payload);
           });

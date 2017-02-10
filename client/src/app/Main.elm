@@ -159,6 +159,7 @@ type Msg
     = LoadWatchList (Result Http.Error (List WatchListMovie))
     | LoadBechdel String (Result Http.Error (Maybe BechdelRating))
     | LoadJustWatch String (Result Http.Error (Maybe JustWatchData))
+    | LoadConfirmNetflix String (Result Http.Error (Maybe String))
     | SetTableState Table.State
 
 
@@ -265,8 +266,42 @@ update msg model =
                                 Dict.insert imdbId updatedMovie model.movies
                         in
                             ( { model | movies = newMovies }
+                            , case updatedMovie.netflixUrl of
+                                Maybe.Just netflixUrl ->
+                                    getConfirmNetflixData imdbId netflixUrl
+
+                                _ ->
+                                    Cmd.none
+                            )
+
+                    _ ->
+                        ( model
+                        , Cmd.none
+                        )
+
+        LoadConfirmNetflix imdbId (Err error) ->
+            ( model
+            , Cmd.none
+            )
+
+        LoadConfirmNetflix imdbId (Ok maybeNetflixUrl) ->
+            let
+                movie =
+                    Dict.get imdbId model.movies
+            in
+                case movie of
+                    Maybe.Just movie ->
+                        let
+                            updatedMovie =
+                                { movie
+                                    | netflixUrl = maybeNetflixUrl
+                                }
+
+                            newMovies =
+                                Dict.insert imdbId updatedMovie model.movies
+                        in
+                            ( { model | movies = newMovies }
                             , Cmd.none
-                              -- TODO: Verify netflix url
                             )
 
                     _ ->
@@ -673,6 +708,21 @@ decodeJustWatchScore =
     Decode.map2 JustWatchScore
         (Decode.field "provider_type" Decode.string)
         (Decode.field "value" Decode.float)
+
+
+
+-- NETFLIX
+
+
+getConfirmNetflixData : String -> String -> Cmd Msg
+getConfirmNetflixData imdbId netflixUrl =
+    Http.send (LoadConfirmNetflix imdbId) <|
+        Http.get (apiUrl ("/api/netflix?locale=is&imdbId=" ++ imdbId ++ "&netflixUrl=" ++ netflixUrl)) decodeConfirmNetflixData
+
+
+decodeConfirmNetflixData : Decode.Decoder (Maybe String)
+decodeConfirmNetflixData =
+    Decode.maybe (Decode.at [ "data", "netflixUrl" ] Decode.string)
 
 
 
