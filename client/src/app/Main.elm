@@ -136,19 +136,20 @@ type alias Model =
     }
 
 
+emptyModel : Flags -> Model
+emptyModel flags =
+    { list = Maybe.Nothing
+    , movies = Dict.empty
+    , tableState = Table.initialSort "Priority"
+    , buildInfo = BuildInfo flags.build_version flags.build_time flags.build_tier
+    }
+
+
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    let
-        model =
-            { list = Maybe.Nothing
-            , movies = Dict.empty
-            , tableState = Table.initialSort "Priority"
-            , buildInfo = BuildInfo flags.build_version flags.build_time flags.build_tier
-            }
-    in
-        ( model
-        , getWatchlistData "ur10614064"
-        )
+    ( emptyModel flags
+    , getWatchlistData "ur10614064"
+    )
 
 
 
@@ -189,9 +190,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         LoadWatchList (Err error) ->
-            ( model
-            , Cmd.none
-            )
+            model ! []
 
         LoadWatchList (Ok watchListMovies) ->
             let
@@ -207,15 +206,11 @@ update msg model =
                 justWatchCommands =
                     List.map (\movie -> getJustWatchData movie.id movie.title) watchListMovies
             in
-                ( { model | list = Maybe.Just list, movies = Dict.union newMovies model.movies }
-                  -- We probably eventually want to merge the data here, or simply store it separately
-                , Cmd.batch (List.append justWatchCommands bechdelCommands)
-                )
+                { model | list = Maybe.Just list, movies = Dict.union newMovies model.movies }
+                    ! (List.append justWatchCommands bechdelCommands)
 
         LoadBechdel imdbId (Err error) ->
-            ( model
-            , Cmd.none
-            )
+            model ! []
 
         LoadBechdel imdbId (Ok bechdelRating) ->
             let
@@ -231,19 +226,13 @@ update msg model =
                             newMovies =
                                 Dict.insert imdbId movieWithBechdelRating model.movies
                         in
-                            ( { model | movies = newMovies }
-                            , Cmd.none
-                            )
+                            { model | movies = newMovies } ! []
 
                     Maybe.Nothing ->
-                        ( model
-                        , Cmd.none
-                        )
+                        model ! []
 
         LoadJustWatch imdbId (Err error) ->
-            ( model
-            , Cmd.none
-            )
+            model ! []
 
         LoadJustWatch imdbId (Ok justWatchData) ->
             let
@@ -265,24 +254,19 @@ update msg model =
                             newMovies =
                                 Dict.insert imdbId updatedMovie model.movies
                         in
-                            ( { model | movies = newMovies }
-                            , case updatedMovie.netflixUrl of
-                                Maybe.Just netflixUrl ->
-                                    getConfirmNetflixData imdbId netflixUrl
+                            { model | movies = newMovies }
+                                ! case updatedMovie.netflixUrl of
+                                    Maybe.Just netflixUrl ->
+                                        [ getConfirmNetflixData imdbId netflixUrl ]
 
-                                _ ->
-                                    Cmd.none
-                            )
+                                    _ ->
+                                        []
 
                     _ ->
-                        ( model
-                        , Cmd.none
-                        )
+                        model ! []
 
         LoadConfirmNetflix imdbId (Err error) ->
-            ( model
-            , Cmd.none
-            )
+            model ! []
 
         LoadConfirmNetflix imdbId (Ok maybeNetflixUrl) ->
             let
@@ -300,19 +284,13 @@ update msg model =
                             newMovies =
                                 Dict.insert imdbId updatedMovie model.movies
                         in
-                            ( { model | movies = newMovies }
-                            , Cmd.none
-                            )
+                            { model | movies = newMovies } ! []
 
                     _ ->
-                        ( model
-                        , Cmd.none
-                        )
+                        model ! []
 
         SetTableState newState ->
-            ( { model | tableState = newState }
-            , Cmd.none
-            )
+            { model | tableState = newState } ! []
 
 
 offerOrdinal : JustWatchOffer -> ( Int, Int, Float )
