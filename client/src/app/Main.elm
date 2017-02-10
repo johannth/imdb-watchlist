@@ -25,7 +25,7 @@ main =
         { init = init
         , view = rootView
         , update = update
-        , subscriptions = subscriptions
+        , subscriptions = \_ -> Sub.none
         }
 
 
@@ -723,12 +723,3 @@ getConfirmNetflixData imdbId netflixUrl =
 decodeConfirmNetflixData : Decode.Decoder (Maybe String)
 decodeConfirmNetflixData =
     Decode.maybe (Decode.at [ "data", "netflixUrl" ] Decode.string)
-
-
-
--- SUBSCRIPTIONS
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
