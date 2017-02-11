@@ -244,22 +244,22 @@ calculatePriority movie =
             calculateStreamabilityWeight movie
 
         runTimeWeight =
-            1 / 5
+            1 / 3
 
         normalizedRunTime =
             runTimeRatingFormula 90 0.5 (extractValueToFloat 90 movie.runTime)
 
         metascoreWeight =
-            1 / 5
+            1 / 9
 
         tomatoMeterWeight =
-            1 / 5
+            1 / 9
 
         imdbRatingWeight =
-            1 / 5
+            1 / 9
 
         bechdelWeight =
-            1 / 5
+            1 / 3
 
         normalizedBechdel =
             extractValueToFloat 50 (Maybe.map normalizeBechdel movie.bechdelRating)
