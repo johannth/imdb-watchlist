@@ -9,7 +9,8 @@ import Utils
 init : Flags -> ( Model, Cmd Msg )
 init flags =
     ( emptyModel flags
-    , Api.getWatchlistData "ur10614064"
+    , Api.getWatchlistData "ur43843111"
+      --"ur10614064"
     )
 
 
@@ -158,16 +159,40 @@ calculateStreamabilityWeight movie =
     if List.any Utils.maybeHasValue [ movie.netflix, movie.hbo ] then
         1
     else if List.any Utils.maybeHasValue [ movie.itunes, movie.amazon ] then
-        0.9
+        0.6
     else
         0.1
+
+
+toInt : Bool -> Int
+toInt bool =
+    case bool of
+        True ->
+            1
+
+        False ->
+            0
+
+
+normalizeBechdel : BechdelRating -> Int
+normalizeBechdel bechdel =
+    round ((toFloat bechdel.rating - 0.5 * (toFloat (toInt bechdel.dubious))) / 3.0 * 100)
+
+
+runTimeRatingFormula : Float -> Float -> Float -> Float
+runTimeRatingFormula optimalRunTime optimalRunTimeScore runTime =
+    let
+        k =
+            (optimalRunTime * optimalRunTimeScore) / (1 - optimalRunTimeScore)
+    in
+        k / (runTime + k) * 100
 
 
 calculatePriority : Movie -> Float
 calculatePriority movie =
     let
-        extractValueToFloat maybeInt =
-            Maybe.withDefault 50 (Maybe.map toFloat maybeInt)
+        extractValueToFloat default maybeInt =
+            Maybe.withDefault default (Maybe.map toFloat maybeInt)
 
         streamabilityWeight =
             calculateStreamabilityWeight movie
@@ -176,7 +201,7 @@ calculatePriority movie =
             1 / 5
 
         normalizedRunTime =
-            90 * (1 / (extractValueToFloat movie.runTime + 90))
+            runTimeRatingFormula 90 0.5 (extractValueToFloat 90 movie.runTime)
 
         metascoreWeight =
             1 / 5
@@ -191,15 +216,15 @@ calculatePriority movie =
             1 / 5
 
         normalizedBechdel =
-            extractValueToFloat (Maybe.map .rating movie.bechdelRating) / 3
+            extractValueToFloat 50 (Maybe.map normalizeBechdel movie.bechdelRating)
     in
         streamabilityWeight
             * (metascoreWeight
-                * (extractValueToFloat movie.metascore)
+                * (extractValueToFloat 50 movie.metascore)
                 + tomatoMeterWeight
-                * (extractValueToFloat movie.rottenTomatoesMeter)
+                * (extractValueToFloat 50 movie.rottenTomatoesMeter)
                 + imdbRatingWeight
-                * (extractValueToFloat movie.imdbRating)
+                * (extractValueToFloat 50 movie.imdbRating)
                 + bechdelWeight
                 * normalizedBechdel
                 + runTimeWeight
