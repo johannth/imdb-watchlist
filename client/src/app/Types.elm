@@ -80,6 +80,15 @@ watchListMovieToMovie watchListMovie =
     }
 
 
+type alias PriorityWeights =
+    { runTime : Float
+    , metascore : Float
+    , tomatoMeter : Float
+    , imdbRating : Float
+    , bechdel : Float
+    }
+
+
 
 -- BUILD INFO
 

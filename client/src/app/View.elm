@@ -58,7 +58,7 @@ config =
             , maybeIntColumn "Metascore" .metascore
             , maybeIntColumn "Tomatometer" .rottenTomatoesMeter
             , maybeIntColumn "Imdb Rating" .imdbRating
-            , maybeIntColumn "Bechdel" (\movie -> Maybe.map .rating movie.bechdelRating)
+            , maybeIntColumn "Bechdel" (\movie -> Maybe.map State.normalizeBechdel movie.bechdelRating)
             , streamColumn "Netflix" .netflix
             , streamColumn "HBO" .hbo
             , streamColumn "Amazon" .amazon

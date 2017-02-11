@@ -1,4 +1,4 @@
-module State exposing (init, update, calculatePriority)
+module State exposing (init, update, calculatePriority, calculatePriorityWithWeights, defaultPriorityWeights, normalizeBechdel, normalizeRunTime)
 
 import Dict
 import Api
@@ -210,32 +210,45 @@ calculateStreamabilityWeight movie =
         0.1
 
 
-toInt : Bool -> Int
-toInt bool =
-    case bool of
-        True ->
-            1
-
-        False ->
-            0
-
-
 normalizeBechdel : BechdelRating -> Int
 normalizeBechdel bechdel =
-    round ((toFloat bechdel.rating - 0.5 * (toFloat (toInt bechdel.dubious))) / 3.0 * 100)
+    let
+        toInt : Bool -> Int
+        toInt bool =
+            case bool of
+                True ->
+                    1
+
+                False ->
+                    0
+
+        ratingAdjustedForDubious =
+            max 0 (toFloat bechdel.rating - 0.5 * (toFloat << toInt) bechdel.dubious)
+    in
+        round (ratingAdjustedForDubious / 3.0 * 100)
 
 
-runTimeRatingFormula : Float -> Float -> Float -> Float
-runTimeRatingFormula optimalRunTime optimalRunTimeScore runTime =
+normalizeRunTime : Float -> Float
+normalizeRunTime =
+    normalizeRunTimeWithParameters 120 0.5
+
+
+normalizeRunTimeWithParameters : Float -> Float -> Float -> Float
+normalizeRunTimeWithParameters optimalRunTime optimalRunTimeScore runTime =
     let
         k =
-            (optimalRunTime * optimalRunTimeScore) / (1 - optimalRunTimeScore)
+            (optimalRunTime ^ 2 * optimalRunTimeScore) / (1 - optimalRunTimeScore)
     in
-        k / (runTime + k) * 100
+        k / (runTime ^ 2 + k) * 100
 
 
 calculatePriority : Movie -> Float
-calculatePriority movie =
+calculatePriority =
+    calculatePriorityWithWeights defaultPriorityWeights
+
+
+calculatePriorityWithWeights : PriorityWeights -> Movie -> Float
+calculatePriorityWithWeights weights movie =
     let
         extractValueToFloat default maybeInt =
             Maybe.withDefault default (Maybe.map toFloat maybeInt)
@@ -243,36 +256,31 @@ calculatePriority movie =
         streamabilityWeight =
             calculateStreamabilityWeight movie
 
-        runTimeWeight =
-            1 / 3
-
         normalizedRunTime =
-            runTimeRatingFormula 90 0.5 (extractValueToFloat 90 movie.runTime)
-
-        metascoreWeight =
-            1 / 9
-
-        tomatoMeterWeight =
-            1 / 9
-
-        imdbRatingWeight =
-            1 / 9
-
-        bechdelWeight =
-            1 / 3
+            normalizeRunTime (extractValueToFloat 90 movie.runTime)
 
         normalizedBechdel =
             extractValueToFloat 50 (Maybe.map normalizeBechdel movie.bechdelRating)
     in
         streamabilityWeight
-            * (metascoreWeight
+            * (weights.metascore
                 * (extractValueToFloat 50 movie.metascore)
-                + tomatoMeterWeight
+                + weights.tomatoMeter
                 * (extractValueToFloat 50 movie.rottenTomatoesMeter)
-                + imdbRatingWeight
+                + weights.imdbRating
                 * (extractValueToFloat 50 movie.imdbRating)
-                + bechdelWeight
+                + weights.bechdel
                 * normalizedBechdel
-                + runTimeWeight
+                + weights.runTime
                 * normalizedRunTime
               )
+
+
+defaultPriorityWeights : PriorityWeights
+defaultPriorityWeights =
+    { runTime = 1 / 3
+    , metascore = 1 / 9
+    , tomatoMeter = 1 / 9
+    , imdbRating = 1 / 9
+    , bechdel = 1 / 3
+    }
