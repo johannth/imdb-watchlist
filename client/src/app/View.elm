@@ -1,33 +1,50 @@
 module View exposing (rootView)
 
+import Table
+import Set
+import Dict
+import State
+import Json.Decode as Decode
+import Html.Events
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Table
-import Dict
 import Types exposing (..)
-import State
 
 
 rootView : Model -> Html Msg
-rootView { list, movies, tableState, buildInfo } =
-    div [ id "content" ]
-        [ h1 [ id "title" ] [ text "Watchlist" ]
-        , div [ id "list" ]
-            [ case list of
-                Nothing ->
-                    text "Loading..."
+rootView { imdbUserIdInputCurrentValue, lists, movies, tableState, buildInfo } =
+    let
+        list =
+            Dict.values lists
+                |> List.map Set.fromList
+                |> List.foldl Set.union Set.empty
+                |> Set.toList
+    in
+        div [ id "content" ]
+            [ h1 [ id "title" ] [ text "Watchlist" ]
+            , imdbUserIdTextInput imdbUserIdInputCurrentValue
+            , div [ id "imdb-users" ] (Dict.keys lists |> List.map imdbUserIdView)
+            , div [ id "list" ]
+                [ case list of
+                    [] ->
+                        text
+                            (if Dict.size lists > 0 then
+                                "Loading..."
+                             else
+                                ""
+                            )
 
-                Just list ->
-                    let
-                        expandedList =
-                            List.filterMap (\movieId -> Dict.get movieId movies) list
-                    in
-                        Table.view config tableState expandedList
+                    list ->
+                        let
+                            expandedList =
+                                List.filterMap (\movieId -> Dict.get movieId movies) list
+                        in
+                            Table.view config tableState expandedList
+                ]
+            , div [ id "footer" ]
+                [ buildInfoView buildInfo
+                ]
             ]
-        , div [ id "footer" ]
-            [ buildInfoView buildInfo
-            ]
-        ]
 
 
 config : Table.Config Movie Msg
@@ -120,3 +137,46 @@ priorityColumn =
         , viewData = State.calculatePriority >> toString
         , sorter = Table.decreasingOrIncreasingBy State.calculatePriority
         }
+
+
+imdbUserIdView : String -> Html Msg
+imdbUserIdView imdbUserId =
+    span [ class "imdb-user-link" ]
+        [ a [ target "_blank", href ("http://www.imdb.com/user/" ++ imdbUserId ++ "/watchlist?view=detail") ]
+            [ text imdbUserId
+            ]
+        , a [ class "imdb-user-remove-button", href "#", Html.Events.onClick (ClearList imdbUserId) ] [ text "X" ]
+        ]
+
+
+imdbUserIdTextInput : String -> Html Msg
+imdbUserIdTextInput currentValue =
+    let
+        properties =
+            [ placeholder "Enter IMDB userId", onEnter LookupWatchList, Html.Events.onInput ImdbUserIdInput, value currentValue ]
+    in
+        div [ id "imdb-user-id-input" ]
+            [ input properties []
+            ]
+
+
+onEnter : (String -> Msg) -> Attribute Msg
+onEnter msg =
+    let
+        isEnter : Int -> Decode.Decoder String
+        isEnter code =
+            if code == 13 then
+                Decode.succeed "ENTER pressed"
+            else
+                Decode.fail "not ENTER"
+
+        decodeEnter =
+            Decode.andThen isEnter Html.Events.keyCode
+
+        decodeEnterWithValue : Decode.Decoder Msg
+        decodeEnterWithValue =
+            Decode.map2 (\key value -> msg value)
+                decodeEnter
+                Html.Events.targetValue
+    in
+        Html.Events.on "keydown" decodeEnterWithValue

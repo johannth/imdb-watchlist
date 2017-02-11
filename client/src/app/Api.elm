@@ -11,9 +11,9 @@ apiUrl path =
 
 
 getWatchlistData : String -> Cmd Msg
-getWatchlistData userId =
-    Http.send LoadWatchList <|
-        Http.get (apiUrl ("/api/watchlist?userId=" ++ userId)) decodeWatchlist
+getWatchlistData imdbUserId =
+    Http.send (LoadWatchList imdbUserId) <|
+        Http.get (apiUrl ("/api/watchlist?userId=" ++ imdbUserId)) decodeWatchlist
 
 
 decodeWatchlist : Decode.Decoder (List WatchListMovie)

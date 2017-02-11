@@ -18,6 +18,22 @@ body {
   cursor: pointer;
 }
 
+#imdb-user-id-input {
+  margin-bottom: 10px;
+}
+
+#imdb-users {
+  margin-bottom: 10px;
+}
+
+.imdb-user-link {
+  margin-right: 10px;
+}
+
+.imdb-user-remove-button {
+  margin-left: 5px;
+}
+
 #footer {
   border-top: 1px solid black;
   text-align: center;

@@ -6,7 +6,8 @@ import Http
 
 
 type alias Model =
-    { list : Maybe (List String)
+    { imdbUserIdInputCurrentValue : String
+    , lists : Dict.Dict String (List String)
     , movies : Dict.Dict String Movie
     , buildInfo : BuildInfo
     , tableState : Table.State
@@ -14,7 +15,10 @@ type alias Model =
 
 
 type Msg
-    = LoadWatchList (Result Http.Error (List WatchListMovie))
+    = LookupWatchList String
+    | ImdbUserIdInput String
+    | LoadWatchList String (Result Http.Error (List WatchListMovie))
+    | ClearList String
     | LoadBechdel String (Result Http.Error (Maybe BechdelRating))
     | LoadJustWatch String (Result Http.Error (Maybe JustWatchData))
     | LoadConfirmNetflix String (Result Http.Error (Maybe String))
@@ -23,7 +27,8 @@ type Msg
 
 emptyModel : Flags -> Model
 emptyModel flags =
-    { list = Maybe.Nothing
+    { imdbUserIdInputCurrentValue = ""
+    , lists = Dict.empty
     , movies = Dict.empty
     , tableState = Table.initialSort "Priority"
     , buildInfo = BuildInfo flags.build_version flags.build_time flags.build_tier

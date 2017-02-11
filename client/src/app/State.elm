@@ -8,19 +8,29 @@ import Utils
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( emptyModel flags
-    , Api.getWatchlistData "ur43843111"
-      --"ur10614064"
-    )
+    emptyModel flags ! []
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        LoadWatchList (Err error) ->
+        ImdbUserIdInput partialImdbUserId ->
+            { model | imdbUserIdInputCurrentValue = partialImdbUserId } ! []
+
+        LookupWatchList imdbUserId ->
+            { model
+                | imdbUserIdInputCurrentValue = ""
+                , lists = Dict.insert imdbUserId [] model.lists
+            }
+                ! [ Api.getWatchlistData imdbUserId ]
+
+        ClearList imdbUserId ->
+            { model | lists = Dict.remove imdbUserId model.lists } ! []
+
+        LoadWatchList imdbUserId (Err error) ->
             model ! []
 
-        LoadWatchList (Ok watchListMovies) ->
+        LoadWatchList imdbUserId (Ok watchListMovies) ->
             let
                 listOfIds =
                     List.map .id watchListMovies
@@ -36,7 +46,7 @@ update msg model =
                     List.map (\movie -> Api.getJustWatchData movie.id movie.title) watchListMovies
             in
                 { model
-                    | list = Just listOfIds
+                    | lists = Dict.insert imdbUserId listOfIds model.lists
                     , movies = Dict.union newMovies model.movies
                 }
                     ! (justWatchCommands ++ bechdelCommands)
