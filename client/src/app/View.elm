@@ -54,7 +54,7 @@ config =
         , toMsg = SetTableState
         , columns =
             [ movieTitleColumn
-            , maybeIntColumn "Run Time (min)" .runTime
+            , runTimeColumn
             , maybeIntColumn "Metascore" .metascore
             , maybeIntColumn "Tomatometer" .rottenTomatoesMeter
             , maybeIntColumn "Imdb Rating" .imdbRating
@@ -127,6 +127,40 @@ maybeIntColumn name accessor =
             { name = name
             , viewData = valueToString
             , sorter = Table.decreasingOrIncreasingBy extractWithDefault
+            }
+
+
+runTimeToString : Int -> String
+runTimeToString runTime =
+    if runTime < 60 then
+        toString runTime
+    else
+        let
+            hours =
+                runTime // 60
+
+            minutes =
+                runTime % 60
+
+            minutesIfNotZero =
+                if minutes == 0 then
+                    ""
+                else
+                    (toString minutes) ++ "m"
+        in
+            (toString hours) ++ "h " ++ minutesIfNotZero
+
+
+runTimeColumn : Table.Column Movie Msg
+runTimeColumn =
+    let
+        valueToString movie =
+            Maybe.withDefault "?" (Maybe.map runTimeToString movie.runTime)
+    in
+        Table.customColumn
+            { name = "Run Time"
+            , viewData = valueToString
+            , sorter = Table.decreasingOrIncreasingBy (\movie -> (Maybe.withDefault -1 movie.runTime))
             }
 
 
