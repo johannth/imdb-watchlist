@@ -3,6 +3,7 @@ module Types exposing (..)
 import Table
 import Dict
 import Http
+import Navigation
 
 
 type alias Model =
@@ -23,6 +24,7 @@ type Msg
     | LoadJustWatch String (Result Http.Error (Maybe JustWatchData))
     | LoadConfirmNetflix String (Result Http.Error (Maybe String))
     | SetTableState Table.State
+    | UrlChange Navigation.Location
 
 
 emptyModel : Flags -> Model

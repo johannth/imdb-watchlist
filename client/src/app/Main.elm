@@ -1,9 +1,9 @@
 module Main exposing (..)
 
-import Html exposing (..)
 import Types exposing (..)
 import State
 import View
+import Navigation
 
 
 -- Hot Loading Requires the program to accept flags
@@ -11,7 +11,7 @@ import View
 
 main : Program Flags Model Msg
 main =
-    Html.programWithFlags
+    Navigation.programWithFlags UrlChange
         { init = State.init
         , view = View.rootView
         , update = State.update

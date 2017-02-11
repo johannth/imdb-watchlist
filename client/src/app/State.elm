@@ -4,11 +4,36 @@ import Dict
 import Api
 import Types exposing (..)
 import Utils
+import Navigation
+import UrlParser exposing ((<?>))
 
 
-init : Flags -> ( Model, Cmd Msg )
-init flags =
-    emptyModel flags ! []
+init : Flags -> Navigation.Location -> ( Model, Cmd Msg )
+init flags location =
+    let
+        imdbUserIdsFromPath =
+            parseImdbUserIdsFromPath location
+
+        initialModel =
+            emptyModel flags
+
+        initalLists =
+            Dict.fromList (List.map (Utils.lift2 identity (always [])) imdbUserIdsFromPath)
+    in
+        { initialModel | lists = initalLists } ! List.map Api.getWatchlistData imdbUserIdsFromPath
+
+
+parseImdbUserIdsFromPath : Navigation.Location -> List String
+parseImdbUserIdsFromPath location =
+    UrlParser.parsePath (UrlParser.s "" <?> UrlParser.stringParam "imdbUserIds") location
+        |> Maybe.andThen identity
+        |> Maybe.map (String.split ",")
+        |> Maybe.withDefault []
+
+
+updatedUrl : Model -> String
+updatedUrl model =
+    "?imdbUserIds=" ++ (String.join "," (Dict.keys model.lists))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -18,14 +43,22 @@ update msg model =
             { model | imdbUserIdInputCurrentValue = partialImdbUserId } ! []
 
         LookupWatchList imdbUserId ->
-            { model
-                | imdbUserIdInputCurrentValue = ""
-                , lists = Dict.insert imdbUserId [] model.lists
-            }
-                ! [ Api.getWatchlistData imdbUserId ]
+            let
+                newModel =
+                    { model
+                        | imdbUserIdInputCurrentValue = ""
+                        , lists = Dict.insert imdbUserId [] model.lists
+                    }
+            in
+                newModel
+                    ! [ Api.getWatchlistData imdbUserId, Navigation.modifyUrl (updatedUrl newModel) ]
 
         ClearList imdbUserId ->
-            { model | lists = Dict.remove imdbUserId model.lists } ! []
+            let
+                newModel =
+                    { model | lists = Dict.remove imdbUserId model.lists }
+            in
+                newModel ! [ Navigation.modifyUrl (updatedUrl newModel) ]
 
         LoadWatchList imdbUserId (Err error) ->
             model ! []
@@ -121,6 +154,9 @@ update msg model =
 
         SetTableState newState ->
             { model | tableState = newState } ! []
+
+        UrlChange newLocation ->
+            model ! []
 
 
 extractBestOffer : JustWatchProvider -> List JustWatchOffer -> Maybe JustWatchOffer
