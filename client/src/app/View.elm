@@ -134,7 +134,7 @@ priorityColumn : Table.Column Movie Msg
 priorityColumn =
     Table.customColumn
         { name = "Priority"
-        , viewData = State.calculatePriority >> toString
+        , viewData = State.calculatePriority >> round >> toString
         , sorter = Table.decreasingOrIncreasingBy State.calculatePriority
         }
 
