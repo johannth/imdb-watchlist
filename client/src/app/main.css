@@ -18,6 +18,11 @@ body {
   cursor: pointer;
 }
 
+#body {
+  max-width: 1400px;
+  margin: auto;
+}
+
 #imdb-user-id-input {
   margin-bottom: 10px;
 }
@@ -30,8 +35,40 @@ body {
   margin-right: 10px;
 }
 
+.imdb-user-link a {
+  color: #000;
+  cursor: pointer;
+}
+
 .imdb-user-remove-button {
+  text-decoration: none;
   margin-left: 5px;
+  border-left: 1px solid #000;
+  display: inline-block;
+  padding-left: 5px;
+  padding-right: 5px;
+  text-align: center;
+}
+
+.imdb-user-remove-button:hover {
+  background-color: gray;
+}
+
+#list table {
+  width: 100%;
+}
+
+#list a {
+  color: #000;
+  cursor: pointer;
+}
+
+#list th {
+  text-align: left;
+}
+
+.value-unknown {
+  opacity: 0.3;
 }
 
 #footer {

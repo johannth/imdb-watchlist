@@ -22,24 +22,26 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, tableState, buildInfo } =
     in
         div [ id "content" ]
             [ h1 [ id "title" ] [ text "Watchlist" ]
-            , imdbUserIdTextInput imdbUserIdInputCurrentValue
-            , div [ id "imdb-users" ] (Dict.keys lists |> List.map imdbUserIdView)
-            , div [ id "list" ]
-                [ case list of
-                    [] ->
-                        text
-                            (if Dict.size lists > 0 then
-                                "Loading..."
-                             else
-                                ""
-                            )
+            , div [ id "body" ]
+                [ imdbUserIdTextInput imdbUserIdInputCurrentValue
+                , div [ id "imdb-users" ] (Dict.keys lists |> List.map imdbUserIdView)
+                , div [ id "list" ]
+                    [ case list of
+                        [] ->
+                            text
+                                (if Dict.size lists > 0 then
+                                    "Loading..."
+                                 else
+                                    ""
+                                )
 
-                    list ->
-                        let
-                            expandedList =
-                                List.filterMap (\movieId -> Dict.get movieId movies) list
-                        in
-                            Table.view config tableState expandedList
+                        list ->
+                            let
+                                expandedList =
+                                    List.filterMap (\movieId -> Dict.get movieId movies) list
+                            in
+                                Table.view config tableState expandedList
+                    ]
                 ]
             , div [ id "footer" ]
                 [ buildInfoView buildInfo
@@ -119,15 +121,35 @@ maybeIntColumn name accessor =
     let
         extractWithDefault movie =
             Maybe.withDefault -1 (accessor movie)
-
-        valueToString movie =
-            Maybe.withDefault "?" (Maybe.map toString (accessor movie))
     in
-        Table.customColumn
+        Table.veryCustomColumn
             { name = name
-            , viewData = valueToString
+            , viewData = intCell << accessor
             , sorter = Table.decreasingOrIncreasingBy extractWithDefault
             }
+
+
+intCell : Maybe Int -> Table.HtmlDetails Msg
+intCell =
+    intCellWithToolTip Nothing
+
+
+intCellWithToolTip : Maybe String -> Maybe Int -> Table.HtmlDetails Msg
+intCellWithToolTip tooltip value =
+    let
+        valueAsString =
+            Maybe.withDefault "?" (Maybe.map toString value)
+
+        properties =
+            [ title (Maybe.withDefault "" tooltip) ]
+                ++ if valueAsString == "?" then
+                    [ class "value-unknown" ]
+                   else
+                    []
+    in
+        Table.HtmlDetails []
+            [ span properties [ text valueAsString ]
+            ]
 
 
 runTimeToString : Int -> String
@@ -157,9 +179,9 @@ runTimeColumn =
         valueToString movie =
             Maybe.withDefault "?" (Maybe.map runTimeToString movie.runTime)
     in
-        Table.customColumn
+        Table.veryCustomColumn
             { name = "Run Time"
-            , viewData = valueToString
+            , viewData = intCell << .runTime
             , sorter = Table.decreasingOrIncreasingBy (\movie -> (Maybe.withDefault -1 movie.runTime))
             }
 
@@ -172,13 +194,10 @@ bechdelColumn =
 
         extractWithDefault movie =
             Maybe.withDefault -1 (accessor movie)
-
-        valueToString movie =
-            Maybe.withDefault "?" (Maybe.map toString (accessor movie))
     in
         Table.veryCustomColumn
             { name = "Bechdel"
-            , viewData = \movie -> cellWithTooltip (valueToString movie) (bechdelTooltip movie)
+            , viewData = \movie -> intCellWithToolTip (Just (bechdelTooltip movie)) (accessor movie)
             , sorter = Table.decreasingOrIncreasingBy extractWithDefault
             }
 
@@ -236,7 +255,7 @@ imdbUserIdView imdbUserId =
         [ a [ target "_blank", href ("http://www.imdb.com/user/" ++ imdbUserId ++ "/watchlist?view=detail") ]
             [ text imdbUserId
             ]
-        , a [ class "imdb-user-remove-button", href "#", Html.Events.onClick (ClearList imdbUserId) ] [ text "X" ]
+        , a [ class "imdb-user-remove-button", href "#", Html.Events.onClick (ClearList imdbUserId) ] [ text "x" ]
         ]
 
 
