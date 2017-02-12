@@ -58,7 +58,7 @@ config =
             , maybeIntColumn "Metascore" .metascore
             , maybeIntColumn "Tomatometer" .rottenTomatoesMeter
             , maybeIntColumn "Imdb Rating" .imdbRating
-            , maybeIntColumn "Bechdel" (\movie -> Maybe.map State.normalizeBechdel movie.bechdelRating)
+            , bechdelColumn
             , streamColumn "Netflix" .netflix
             , streamColumn "HBO" .hbo
             , streamColumn "Amazon" .amazon
@@ -162,6 +162,63 @@ runTimeColumn =
             , viewData = valueToString
             , sorter = Table.decreasingOrIncreasingBy (\movie -> (Maybe.withDefault -1 movie.runTime))
             }
+
+
+bechdelColumn : Table.Column Movie Msg
+bechdelColumn =
+    let
+        accessor =
+            \movie -> Maybe.map State.normalizeBechdel movie.bechdelRating
+
+        extractWithDefault movie =
+            Maybe.withDefault -1 (accessor movie)
+
+        valueToString movie =
+            Maybe.withDefault "?" (Maybe.map toString (accessor movie))
+    in
+        Table.veryCustomColumn
+            { name = "Bechdel"
+            , viewData = \movie -> cellWithTooltip (valueToString movie) (bechdelTooltip movie)
+            , sorter = Table.decreasingOrIncreasingBy extractWithDefault
+            }
+
+
+bechdelTooltip : Movie -> String
+bechdelTooltip movie =
+    case movie.bechdelRating of
+        Just bechdel ->
+            let
+                prefixWithDubious string =
+                    if bechdel.dubious then
+                        "Dubious: " ++ string
+                    else
+                        string
+            in
+                case bechdel.rating of
+                    0 ->
+                        prefixWithDubious "Movie doesn't have two women :("
+
+                    1 ->
+                        prefixWithDubious "Movie has two women but they don't talk together :("
+
+                    2 ->
+                        prefixWithDubious "Movie has two women that only talk about a man :("
+
+                    3 ->
+                        prefixWithDubious "Movie has two women that talk about something other than a man. Yay!"
+
+                    _ ->
+                        ""
+
+        Nothing ->
+            "Bechdel rating is unknown"
+
+
+cellWithTooltip : String -> String -> Table.HtmlDetails Msg
+cellWithTooltip value tooltip =
+    Table.HtmlDetails []
+        [ span [ title tooltip ] [ text value ]
+        ]
 
 
 priorityColumn : Table.Column Movie Msg
