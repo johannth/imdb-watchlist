@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "babel-watch server.js"
+    "start": "node server.js",
+    "start-dev": "babel-watch server.js"
   },
   "engines": {
     "node": "7.x"
