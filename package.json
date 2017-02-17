@@ -9,7 +9,7 @@
     "start-dev": "concurrently \"yarn run start-server-dev\" \"yarn run start-client-dev\"",
     "start-server-dev": "cd server && yarn start-dev",
     "start-client-dev": "cd client && yarn start",
-    "deploy-server": "git subtree push --prefix server heroku master"
+    "deploy-server": "git push heroku `git subtree split --prefix server master`:master --force"
   },
   "dependencies": {},
   "devDependencies": {
