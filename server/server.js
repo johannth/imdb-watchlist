@@ -227,6 +227,9 @@ app.get('/api/netflix', (req, res) => {
   });
 });
 
-app.listen(3001, () => {
-  console.log('App listening on port 3001!');
+// process.env.PORT lets the port be set by Heroku
+const port = process.env.PORT || 8080;
+
+app.listen(port, () => {
+  console.log(`App listening on port ${port}!`);
 });
