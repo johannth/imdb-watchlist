@@ -1,3 +1,4 @@
+import newrelic from 'newrelic';
 import express from 'express';
 import fetch from 'node-fetch';
 import cheerio from 'cheerio';
@@ -5,7 +6,6 @@ import bodyParser from 'body-parser';
 import Cache from 'async-disk-cache';
 import request from 'request';
 import cors from 'cors';
-import newrelic from 'newrelic';
 
 const app = express();
 
