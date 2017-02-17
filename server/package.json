@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "start-dev": "babel-watch server.js"
+    "start-dev": "babel-watch server.js",
+    "heroku-postbuild": "yarn add babel && babel server.js"
   },
   "engines": {
     "node": "7.x"
