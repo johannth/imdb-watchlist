@@ -14,6 +14,10 @@ const app = express();
 
 const cache = redis.createClient({ url: process.env.REDIS_URL });
 
+if (process.env.DISABLE_CACHE) {
+  console.log('Cache is disabled');
+}
+
 app.use(bodyParser.json());
 app.use(cors());
 
@@ -25,6 +29,9 @@ const handleErrors = response => {
 };
 
 const getJsonFromCache = cache => key => {
+  if (process.env.DISABLE_CACHE) {
+    return Promise.resolve(null);
+  }
   return cache.getAsync(key).then(result => {
     if (result) {
       return JSON.parse(result);
@@ -79,7 +86,7 @@ app.get('/api/justwatch', (req, res) => {
 
   getJsonFromCache(cache)(justwatchCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
-      console.log(`/api/justwatch: Serving from cache ${imdbId}`);
+      console.log(`/api/justwatch ${imdbId}: Serving from cache`);
       res.json(cachedResponse);
       return;
     }
@@ -137,7 +144,7 @@ app.get('/api/bechdel', (req, res) => {
   const imdbId = req.query.imdbId;
   getJsonFromCache(cache)(bechdelCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
-      console.log(`/api/bechdel: Serving from cache ${imdbId}`);
+      console.log(`/api/bechdel ${imdbId}: Serving from cache`);
       res.json(cachedResponse);
       return;
     }
@@ -190,13 +197,14 @@ app.get('/api/netflix', (req, res) => {
   const locale = req.query.locale;
 
   if (!netflixUrl) {
+    console.log(`/api/netflix ${imdbId}: Not a valid netflix url`);
     res.json({ data: null });
     return;
   }
 
   getJsonFromCache(cache)(netflixCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
-      console.log(`/api/netflix: Serving from cache ${imdbId}`);
+      console.log(`/api/netflix ${imdbId}: Serving from cache`);
       res.json(cachedResponse);
       return;
     }
@@ -210,6 +218,9 @@ app.get('/api/netflix', (req, res) => {
       response,
       body
     ) => {
+      console.log(
+        `/api/netflix ${imdbId}: Netflix returned ${response.statusCode} on ${netflixUrlInLocale}`
+      );
       const payload = {
         data: {
           netflixUrl: response.statusCode == 200 ? netflixUrlInLocale : null
