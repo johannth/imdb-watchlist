@@ -213,19 +213,22 @@ app.get('/api/netflix', (req, res) => {
       .replace('/title/', `/${locale}/title/`)
       .replace('http://', 'https://');
 
-    request({ method: 'GET', followRedirect: false, url: netflixUrlInLocale }, (
+    const requestUrl = netflixUrl.replace('http://', 'https://');
+    request({ method: 'GET', followRedirect: false, url: requestUrl }, (
       error,
       response,
       body
     ) => {
+      const locationHeader = response.headers['location'];
       console.log(
-        `/api/netflix ${imdbId}: Netflix returned ${response.statusCode} on ${netflixUrlInLocale} with headers ${Object
-          .entries(response.headers)
-          .join('\n')}`
+        `/api/netflix ${imdbId}: Netflix returned ${response.statusCode} on ${requestUrl} with location ${locationHeader}`
       );
       const payload = {
         data: {
-          netflixUrl: response.statusCode == 200 ? netflixUrlInLocale : null
+          netflixUrl: response.statusCode == 200 ||
+            locationHeader === netflixUrlInLocale
+            ? netflixUrlInLocale
+            : null
         }
       };
 
