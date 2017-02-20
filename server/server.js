@@ -219,7 +219,9 @@ app.get('/api/netflix', (req, res) => {
       body
     ) => {
       console.log(
-        `/api/netflix ${imdbId}: Netflix returned ${response.statusCode} on ${netflixUrlInLocale}`
+        `/api/netflix ${imdbId}: Netflix returned ${response.statusCode} on ${netflixUrlInLocale} with location ${response.headers[
+          'location'
+        ]}`
       );
       const payload = {
         data: {
