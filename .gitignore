@@ -33,3 +33,4 @@ repl-temp-*
 node_modules
 
 .env
+server/build-support/.data
