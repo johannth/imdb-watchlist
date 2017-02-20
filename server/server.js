@@ -3,16 +3,39 @@ import express from 'express';
 import fetch from 'node-fetch';
 import cheerio from 'cheerio';
 import bodyParser from 'body-parser';
-import Cache from 'async-disk-cache';
 import request from 'request';
 import cors from 'cors';
+import bluebird from 'bluebird';
+import redis from 'redis';
+bluebird.promisifyAll(redis.RedisClient.prototype);
+bluebird.promisifyAll(redis.Multi.prototype);
 
 const app = express();
 
-const cache = new Cache('watchlist');
+const cache = redis.createClient({ url: process.env.REDIS_URL });
 
 app.use(bodyParser.json());
 app.use(cors());
+
+const handleErrors = response => {
+  if (!response.ok) {
+    throw Error(response.statusText);
+  }
+  return response;
+};
+
+const getJsonFromCache = cache => key => {
+  return cache.getAsync(key).then(result => {
+    if (result) {
+      return JSON.parse(result);
+    } else {
+      return null;
+    }
+  });
+};
+const saveJsonToCache = cache => (key, value, expiryInSeconds) => {
+  return cache.setexAsync(key, expiryInSeconds, JSON.stringify(value));
+};
 
 app.get('/api/watchlist', (req, res) => {
   fetch(`http://www.imdb.com/user/${req.query.userId}/watchlist?view=detail`)
@@ -50,37 +73,11 @@ const justwatchCacheKey = imdbId => {
   return `justwatch:${imdbId}`;
 };
 
-const saveJsonInCache = json => {
-  return JSON.stringify({ timestamp: Date.now(), value: json });
-};
-
-const getJsonFromCachedEntry = cacheEntry => {
-  if (cacheEntry.isCached) {
-    const cacheValue = JSON.parse(cacheEntry.value);
-    const now = Date.now();
-    if (now - cacheValue.timestamp < 30 * 60 * 1000) {
-      return cacheValue.value;
-    } else {
-      return null;
-    }
-  } else {
-    return null;
-  }
-};
-
-const handleErrors = response => {
-  if (!response.ok) {
-    throw Error(response.statusText);
-  }
-  return response;
-};
-
 app.get('/api/justwatch', (req, res) => {
   const imdbId = req.query.imdbId;
   const title = req.query.title;
 
-  cache.get(justwatchCacheKey(imdbId)).then(cacheEntry => {
-    const cachedResponse = getJsonFromCachedEntry(cacheEntry);
+  getJsonFromCache(cache)(justwatchCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
       console.log(`/api/justwatch: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
@@ -90,7 +87,7 @@ app.get('/api/justwatch', (req, res) => {
     fetch('https://api.justwatch.com/titles/en_US/popular', {
       method: 'POST',
       body: JSON.stringify({
-        content_types: [ 'show', 'movie' ],
+        content_types: ['show', 'movie'],
         query: title
       }),
       headers: {
@@ -121,11 +118,13 @@ app.get('/api/justwatch', (req, res) => {
           }
         };
 
-        cache
-          .set(justwatchCacheKey(imdbId), saveJsonInCache(response))
-          .then(() => {
-            res.json(response);
-          });
+        saveJsonToCache(cache)(
+          justwatchCacheKey(imdbId),
+          response,
+          24 * 60 * 60
+        ).then(() => {
+          res.json(response);
+        });
       });
   });
 });
@@ -136,8 +135,7 @@ const bechdelCacheKey = imdbId => {
 
 app.get('/api/bechdel', (req, res) => {
   const imdbId = req.query.imdbId;
-  cache.get(bechdelCacheKey(imdbId)).then(cacheEntry => {
-    const cachedResponse = getJsonFromCachedEntry(cacheEntry);
+  getJsonFromCache(cache)(bechdelCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
       console.log(`/api/bechdel: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
@@ -167,11 +165,13 @@ app.get('/api/bechdel', (req, res) => {
       .then(json => {
         const response = { data: json };
 
-        cache
-          .set(bechdelCacheKey(imdbId), saveJsonInCache(response))
-          .then(() => {
-            res.json(response);
-          });
+        saveJsonToCache(cache)(
+          bechdelCacheKey(imdbId),
+          response,
+          30 * 24 * 60 * 60
+        ).then(() => {
+          res.json(response);
+        });
       });
   });
 });
@@ -189,13 +189,12 @@ app.get('/api/netflix', (req, res) => {
   const netflixUrl = req.query.netflixUrl;
   const locale = req.query.locale;
 
-  cache.get(netflixCacheKey(imdbId)).then(cacheEntry => {
-    if (!netflixUrl) {
-      res.json({ data: null });
-      return;
-    }
+  if (!netflixUrl) {
+    res.json({ data: null });
+    return;
+  }
 
-    const cachedResponse = getJsonFromCachedEntry(cacheEntry);
+  getJsonFromCache(cache)(netflixCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
       console.log(`/api/netflix: Serving from cache ${imdbId}`);
       res.json(cachedResponse);
@@ -210,20 +209,21 @@ app.get('/api/netflix', (req, res) => {
       error,
       response,
       body
-    ) =>
-      {
-        const payload = {
-          data: {
-            netflixUrl: response.statusCode == 200 ? netflixUrlInLocale : null
-          }
-        };
+    ) => {
+      const payload = {
+        data: {
+          netflixUrl: response.statusCode == 200 ? netflixUrlInLocale : null
+        }
+      };
 
-        cache
-          .set(netflixCacheKey(imdbId), saveJsonInCache(payload))
-          .then(() => {
-            res.json(payload);
-          });
+      saveJsonToCache(cache)(
+        netflixCacheKey(imdbId),
+        payload,
+        24 * 60 * 60
+      ).then(() => {
+        res.json(payload);
       });
+    });
   });
 });
 

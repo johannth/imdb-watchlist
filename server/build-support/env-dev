@@ -1,0 +1,2 @@
+export PORT=3001
+export REDIS_URL=redis://localhost:6379
