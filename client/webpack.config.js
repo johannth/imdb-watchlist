@@ -5,14 +5,16 @@ var HtmlWebpackPlugin = require('html-webpack-plugin');
 var ExtractTextPlugin = require('extract-text-webpack-plugin');
 var child_process = require('child_process');
 
-var TIER = process.env.TIER || "development";
+var TIER = process.env.TIER || 'development';
 
-let gitVersion = child_process.execSync('git rev-parse HEAD', {encoding: 'utf8'});
+let gitVersion = child_process.execSync('git rev-parse HEAD', {
+  encoding: 'utf8'
+});
 
 var commonConfig = {
   output: {
     path: path.resolve(__dirname, 'dist/'),
-    filename: '[hash].js',
+    filename: '[hash].js'
   },
 
   resolve: {
@@ -27,16 +29,17 @@ var commonConfig = {
       filename: 'index.html'
     }),
     new webpack.DefinePlugin({
-        BUILD_TIME: JSON.stringify(new Date()),
-        BUILD_VERSION: JSON.stringify(gitVersion),
-        BUILD_TIER: JSON.stringify(TIER),
+      BUILD_TIME: JSON.stringify(new Date()),
+      BUILD_VERSION: JSON.stringify(gitVersion),
+      BUILD_TIER: JSON.stringify(TIER),
+      API_HOST: JSON.stringify(
+        TIER === 'development' ? 'http://localhost:3001' : process.env.API_HOST
+      )
     })
   ],
 
-  postcss: [
-    require('autoprefixer')
-  ],
-}
+  postcss: [require('autoprefixer')]
+};
 
 if (TIER === 'development') {
   console.log('Serving locally...');
@@ -44,7 +47,7 @@ if (TIER === 'development') {
   module.exports = merge(commonConfig, {
     entry: [
       'webpack-dev-server/client?http://localhost:8080',
-      path.join( __dirname, 'src/static/index.js' )
+      path.join(__dirname, 'src/static/index.js')
     ],
 
     devServer: {
@@ -61,22 +64,16 @@ if (TIER === 'development') {
         },
         {
           test: /\.css$/,
-          loaders: [
-            'style-loader',
-            'css-loader',
-            'postcss-loader'
-          ]
+          loaders: ['style-loader', 'css-loader', 'postcss-loader']
         }
       ]
     }
   });
 }
 
-if (TIER === "production") {
+if (TIER === 'production') {
   module.exports = merge(commonConfig, {
-    entry: [
-      path.join( __dirname, 'src/static/index.js' )
-    ],
+    entry: [path.join(__dirname, 'src/static/index.js')],
 
     module: {
       loaders: [
@@ -101,8 +98,8 @@ if (TIER === "production") {
       new webpack.optimize.OccurrenceOrderPlugin(),
 
       new webpack.optimize.UglifyJsPlugin({
-          minimize:   true,
-          compressor: { warnings: false }
+        minimize: true,
+        compressor: { warnings: false }
       })
     ]
   });

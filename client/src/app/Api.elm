@@ -5,15 +5,15 @@ import Http
 import Types exposing (..)
 
 
-apiUrl : String -> String
-apiUrl path =
-    "http://localhost:3001" ++ path
+apiUrl : String -> String -> String
+apiUrl apiHost path =
+    apiHost ++ path
 
 
-getWatchlistData : String -> Cmd Msg
-getWatchlistData imdbUserId =
+getWatchlistData : String -> String -> Cmd Msg
+getWatchlistData apiHost imdbUserId =
     Http.send (LoadWatchList imdbUserId) <|
-        Http.get (apiUrl ("/api/watchlist?userId=" ++ imdbUserId)) decodeWatchlist
+        Http.get (apiUrl apiHost ("/api/watchlist?userId=" ++ imdbUserId)) decodeWatchlist
 
 
 decodeWatchlist : Decode.Decoder (List WatchListMovie)
@@ -62,10 +62,10 @@ calculateMovieRunTime maybeRunTime maybeNumberOfEpisodes =
 -- BECHDEL
 
 
-getBechdelData : String -> Cmd Msg
-getBechdelData imdbId =
+getBechdelData : String -> String -> Cmd Msg
+getBechdelData apiHost imdbId =
     Http.send (LoadBechdel imdbId) <|
-        Http.get (apiUrl ("/api/bechdel?imdbId=" ++ imdbId)) decodeBechdel
+        Http.get (apiUrl apiHost ("/api/bechdel?imdbId=" ++ imdbId)) decodeBechdel
 
 
 decodeBechdel : Decode.Decoder (Maybe BechdelRating)
@@ -104,10 +104,10 @@ decodeBoolFromInt value =
 -- JUSTWATCH
 
 
-getJustWatchData : String -> String -> Cmd Msg
-getJustWatchData imdbId title =
+getJustWatchData : String -> String -> String -> Cmd Msg
+getJustWatchData apiHost imdbId title =
     Http.send (LoadJustWatch imdbId) <|
-        Http.get (apiUrl ("/api/justwatch?imdbId=" ++ imdbId ++ "&title=" ++ title)) decodeJustWatchData
+        Http.get (apiUrl apiHost ("/api/justwatch?imdbId=" ++ imdbId ++ "&title=" ++ title)) decodeJustWatchData
 
 
 decodeJustWatchData : Decode.Decoder (Maybe JustWatchData)
@@ -188,10 +188,10 @@ decodeJustWatchScore =
 -- NETFLIX
 
 
-getConfirmNetflixData : String -> String -> Cmd Msg
-getConfirmNetflixData imdbId netflixUrl =
+getConfirmNetflixData : String -> String -> String -> Cmd Msg
+getConfirmNetflixData apiHost imdbId netflixUrl =
     Http.send (LoadConfirmNetflix imdbId) <|
-        Http.get (apiUrl ("/api/netflix?locale=is&imdbId=" ++ imdbId ++ "&netflixUrl=" ++ netflixUrl)) decodeConfirmNetflixData
+        Http.get (apiUrl apiHost ("/api/netflix?locale=is&imdbId=" ++ imdbId ++ "&netflixUrl=" ++ netflixUrl)) decodeConfirmNetflixData
 
 
 decodeConfirmNetflixData : Decode.Decoder (Maybe String)

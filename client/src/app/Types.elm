@@ -7,7 +7,8 @@ import Navigation
 
 
 type alias Model =
-    { imdbUserIdInputCurrentValue : String
+    { apiHost : String
+    , imdbUserIdInputCurrentValue : String
     , lists : Dict.Dict String (List String)
     , movies : Dict.Dict String Movie
     , buildInfo : BuildInfo
@@ -29,11 +30,12 @@ type Msg
 
 emptyModel : Flags -> Model
 emptyModel flags =
-    { imdbUserIdInputCurrentValue = ""
+    { apiHost = flags.apiHost
+    , imdbUserIdInputCurrentValue = ""
     , lists = Dict.empty
     , movies = Dict.empty
     , tableState = Table.initialSort "Priority"
-    , buildInfo = BuildInfo flags.build_version flags.build_time flags.build_tier
+    , buildInfo = BuildInfo flags.buildVersion flags.buildTime flags.buildTier
     }
 
 
@@ -94,9 +96,10 @@ type alias PriorityWeights =
 
 
 type alias Flags =
-    { build_version : String
-    , build_tier : String
-    , build_time : String
+    { apiHost : String
+    , buildVersion : String
+    , buildTier : String
+    , buildTime : String
     }
 
 

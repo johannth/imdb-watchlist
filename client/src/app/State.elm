@@ -20,7 +20,7 @@ init flags location =
         initalLists =
             Dict.fromList (List.map (Utils.lift2 identity (always [])) imdbUserIdsFromPath)
     in
-        { initialModel | lists = initalLists } ! List.map Api.getWatchlistData imdbUserIdsFromPath
+        { initialModel | lists = initalLists } ! List.map (Api.getWatchlistData initialModel.apiHost) imdbUserIdsFromPath
 
 
 parseImdbUserIdsFromPath : Navigation.Location -> List String
@@ -51,7 +51,7 @@ update msg model =
                     }
             in
                 newModel
-                    ! [ Api.getWatchlistData imdbUserId, Navigation.modifyUrl (updatedUrl newModel) ]
+                    ! [ Api.getWatchlistData model.apiHost imdbUserId, Navigation.modifyUrl (updatedUrl newModel) ]
 
         ClearList imdbUserId ->
             let
@@ -73,10 +73,10 @@ update msg model =
                         |> Dict.fromList
 
                 bechdelCommands =
-                    List.map Api.getBechdelData listOfIds
+                    List.map (Api.getBechdelData model.apiHost) listOfIds
 
                 justWatchCommands =
-                    List.map (\movie -> Api.getJustWatchData movie.id movie.title) watchListMovies
+                    List.map (\movie -> Api.getJustWatchData model.apiHost movie.id movie.title) watchListMovies
             in
                 { model
                     | lists = Dict.insert imdbUserId listOfIds model.lists
@@ -121,7 +121,7 @@ update msg model =
                         { model | movies = newMovies }
                             ! case updatedMovie.netflix of
                                 Just netflixOffer ->
-                                    [ Api.getConfirmNetflixData imdbId (urlFromOffer netflixOffer) ]
+                                    [ Api.getConfirmNetflixData model.apiHost imdbId (urlFromOffer netflixOffer) ]
 
                                 Nothing ->
                                     []
