@@ -56,11 +56,10 @@ app.get('/api/watchlist', (req, res) => {
 
       const movieIds = watchlistData.list.items.map(i => i.const);
 
-      return fetch(
-        `http://www.imdb.com/title/data?ids=${movieIds.join(
-          ','
-        )}&pageId=${watchlistData.list.id}&pageType=list&subpageType=watchlist`
-      )
+      return fetch(`http://www.imdb.com/title/data?ids=${movieIds.join(',')}`, {
+        method: 'GET',
+        headers: { 'Accept-Language': 'en-US,en' }
+      })
         .then(response => response.json())
         .then(movieData => {
           const movies = movieIds.map(movieId => movieData[movieId].title);
