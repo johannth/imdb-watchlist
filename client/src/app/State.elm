@@ -204,7 +204,7 @@ calculateStreamabilityWeight movie =
     if List.any Utils.maybeHasValue [ movie.netflix, movie.hbo ] then
         1
     else if List.any Utils.maybeHasValue [ movie.itunes, movie.amazon ] then
-        0.6
+        0.7
     else
         0.1
 

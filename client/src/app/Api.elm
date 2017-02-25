@@ -4,6 +4,7 @@ import Json.Decode as Decode
 import Http
 import Types exposing (..)
 import Date exposing (Date)
+import Utils exposing (map9)
 
 
 apiUrl : String -> String -> String
@@ -28,13 +29,14 @@ decodeWatchlistRowIntoMovie =
         normalizeImdbRating rating =
             round (rating * 10)
     in
-        Decode.map8 WatchListMovie
+        map9 WatchListMovie
             (Decode.at [ "id" ] Decode.string)
             (Decode.at [ "primary", "title" ] Decode.string)
             decodeImdbUrl
             decodeItemType
             decodeMovieReleaseDate
             decodeMovieRunTime
+            (Decode.at [ "metadata", "genres" ] (Decode.list Decode.string))
             (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
             (Decode.maybe (Decode.map normalizeImdbRating (Decode.at [ "ratings", "rating" ] Decode.float)))
 

@@ -62,6 +62,7 @@ type alias WatchListMovie =
     , itemType : MovieType
     , releaseDate : Maybe Date
     , runTime : Maybe Int
+    , genres : List String
     , metascore : Maybe Int
     , imdbRating : Maybe Int
     }
@@ -74,6 +75,7 @@ type alias Movie =
     , itemType : MovieType
     , releaseDate : Maybe Date
     , runTime : Maybe Int
+    , genres : List String
     , metascore : Maybe Int
     , rottenTomatoesMeter : Maybe Int
     , imdbRating : Maybe Int
@@ -93,6 +95,7 @@ watchListMovieToMovie watchListMovie =
     , itemType = watchListMovie.itemType
     , releaseDate = watchListMovie.releaseDate
     , runTime = watchListMovie.runTime
+    , genres = watchListMovie.genres
     , metascore = watchListMovie.metascore
     , rottenTomatoesMeter = Maybe.Nothing
     , imdbRating = watchListMovie.imdbRating

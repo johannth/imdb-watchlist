@@ -58,6 +58,7 @@ config =
         , columns =
             [ movieTitleColumn
             , Table.stringColumn "Type" (.itemType >> movieTypetoString)
+            , Table.stringColumn "Genres" (.genres >> List.sort >> (String.join ", "))
             , releaseYearColumn
             , runTimeColumn
             , maybeIntColumn "Metascore" .metascore
