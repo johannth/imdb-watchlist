@@ -67,6 +67,10 @@ body {
   text-align: left;
 }
 
+#list tr:hover {
+  background-color: #D3D3D3;
+}
+
 .value-unknown {
   opacity: 0.3;
 }
