@@ -80,18 +80,19 @@ const justwatchCacheKey = imdbId => {
   return `justwatch:${imdbId}`;
 };
 
-const findBestPossibleJustwatchResult = (title, year, results) => {
+const findBestPossibleJustwatchResult = (title, year, type, results) => {
   if (!results) {
     return null;
   }
 
   return results.filter(result => {
     const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
-    const nameAndYearMatch = titleMatch === 0 &&
+    const titleAndYearMatch = titleMatch === 0 &&
       result.original_release_year === year;
     const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
       result.original_release_year === year;
-    return nameAndYearMatch || fuzzyTitleAndYearMatch;
+    const titleMatchesForSeries = titleMatch === 0 && type === 'series';
+    return titleAndYearMatch || fuzzyTitleAndYearMatch || titleMatchesForSeries;
   })[0];
 };
 
@@ -136,6 +137,7 @@ app.get('/api/justwatch', (req, res) => {
         const possibleItem = findBestPossibleJustwatchResult(
           title,
           year,
+          type,
           json.items
         );
 
