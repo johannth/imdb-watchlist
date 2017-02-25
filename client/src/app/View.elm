@@ -1,7 +1,7 @@
 module View exposing (rootView)
 
 import Table
-import Set
+import Set exposing (Set)
 import Dict
 import State
 import Json.Decode as Decode
@@ -10,15 +10,35 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Types exposing (..)
 import Date
+import Dict exposing (Dict)
+
+
+isSubset : Set comparable -> Set comparable -> Bool
+isSubset setA setB =
+    Set.diff setA setB |> Set.isEmpty
+
+
+movieIsOfGenre : Dict String Movie -> Set String -> String -> Bool
+movieIsOfGenre movies selectedGenres movieId =
+    if Set.isEmpty selectedGenres == True then
+        True
+    else
+        case Dict.get movieId movies of
+            Just movie ->
+                isSubset selectedGenres movie.genres
+
+            Nothing ->
+                False
 
 
 rootView : Model -> Html Msg
-rootView { imdbUserIdInputCurrentValue, lists, movies, tableState, buildInfo } =
+rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, tableState, buildInfo } =
     let
         list =
             Dict.values lists
                 |> List.map Set.fromList
                 |> List.foldl Set.union Set.empty
+                |> Set.filter (movieIsOfGenre movies selectedGenres)
                 |> Set.toList
     in
         div [ id "content" ]
@@ -26,6 +46,7 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, tableState, buildInfo } =
             , div [ id "body" ]
                 [ imdbUserIdTextInput imdbUserIdInputCurrentValue
                 , div [ id "imdb-users" ] (Dict.keys lists |> List.map imdbUserIdView)
+                , div [ id "genres" ] (Set.toList genres |> List.sort |> List.map (genreView selectedGenres))
                 , div [ id "list" ]
                     [ case list of
                         [] ->
@@ -50,6 +71,18 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, tableState, buildInfo } =
             ]
 
 
+genreView : Set String -> String -> Html Msg
+genreView selectedGenres genre =
+    let
+        isSelected =
+            if Set.isEmpty selectedGenres then
+                True
+            else
+                Set.member genre selectedGenres
+    in
+        a [ classList [ ( "genre", True ), ( "selected", isSelected ) ], href "#", Html.Events.onClick (ToggleGenreFilter genre) ] [ text genre ]
+
+
 config : Table.Config Movie Msg
 config =
     Table.config
@@ -58,7 +91,7 @@ config =
         , columns =
             [ movieTitleColumn
             , Table.stringColumn "Type" (.itemType >> movieTypetoString)
-            , Table.stringColumn "Genres" (.genres >> List.sort >> (String.join ", "))
+            , Table.stringColumn "Genres" (.genres >> Set.toList >> List.sort >> (String.join ", "))
             , releaseYearColumn
             , runTimeColumn
             , maybeIntColumn "Metascore" .metascore

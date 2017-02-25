@@ -5,6 +5,7 @@ import Dict
 import Http
 import Navigation
 import Date exposing (Date)
+import Set exposing (Set)
 
 
 type alias Model =
@@ -12,6 +13,8 @@ type alias Model =
     , imdbUserIdInputCurrentValue : String
     , lists : Dict.Dict String (List String)
     , movies : Dict.Dict String Movie
+    , genres : Set String
+    , selectedGenres : Set String
     , buildInfo : BuildInfo
     , tableState : Table.State
     }
@@ -27,6 +30,7 @@ type Msg
     | LoadConfirmNetflix String (Result Http.Error (Maybe String))
     | SetTableState Table.State
     | UrlChange Navigation.Location
+    | ToggleGenreFilter String
 
 
 emptyModel : Flags -> Model
@@ -35,6 +39,8 @@ emptyModel flags =
     , imdbUserIdInputCurrentValue = ""
     , lists = Dict.empty
     , movies = Dict.empty
+    , genres = Set.empty
+    , selectedGenres = Set.empty
     , tableState = Table.initialSort "Priority"
     , buildInfo = BuildInfo flags.buildVersion flags.buildTime flags.buildTier
     }
@@ -62,7 +68,7 @@ type alias WatchListMovie =
     , itemType : MovieType
     , releaseDate : Maybe Date
     , runTime : Maybe Int
-    , genres : List String
+    , genres : Set String
     , metascore : Maybe Int
     , imdbRating : Maybe Int
     }
@@ -75,7 +81,7 @@ type alias Movie =
     , itemType : MovieType
     , releaseDate : Maybe Date
     , runTime : Maybe Int
-    , genres : List String
+    , genres : Set String
     , metascore : Maybe Int
     , rottenTomatoesMeter : Maybe Int
     , imdbRating : Maybe Int

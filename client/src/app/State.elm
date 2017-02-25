@@ -7,6 +7,7 @@ import Utils
 import Navigation
 import UrlParser exposing ((<?>))
 import Date
+import Set
 
 
 init : Flags -> Navigation.Location -> ( Model, Cmd Msg )
@@ -78,10 +79,14 @@ update msg model =
 
                 justWatchCommands =
                     List.map (\movie -> Api.getJustWatchData model.apiHost movie.id movie.title movie.itemType (Maybe.map Date.year movie.releaseDate)) watchListMovies
+
+                newGenres =
+                    List.foldl Set.union Set.empty (List.map .genres (Dict.values newMovies))
             in
                 { model
                     | lists = Dict.insert imdbUserId listOfIds model.lists
                     , movies = Dict.union newMovies model.movies
+                    , genres = Set.union newGenres model.genres
                 }
                     ! (justWatchCommands ++ bechdelCommands)
 
@@ -156,6 +161,14 @@ update msg model =
 
         UrlChange newLocation ->
             model ! []
+
+        ToggleGenreFilter genre ->
+            (if Set.member genre model.selectedGenres then
+                { model | selectedGenres = Set.remove genre model.selectedGenres }
+             else
+                { model | selectedGenres = Set.insert genre model.selectedGenres }
+            )
+                ! []
 
 
 extractBestOffer : JustWatchProvider -> List JustWatchOffer -> Maybe JustWatchOffer

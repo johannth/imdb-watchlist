@@ -54,6 +54,16 @@ body {
   background-color: gray;
 }
 
+.genre {
+  color: #000;
+  margin-right: 5px;
+  opacity: 0.3;
+}
+
+.selected {
+  opacity: 1;
+}
+
 #list table {
   width: 100%;
 }

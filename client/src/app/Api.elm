@@ -5,6 +5,7 @@ import Http
 import Types exposing (..)
 import Date exposing (Date)
 import Utils exposing (map9)
+import Set
 
 
 apiUrl : String -> String -> String
@@ -36,7 +37,7 @@ decodeWatchlistRowIntoMovie =
             decodeItemType
             decodeMovieReleaseDate
             decodeMovieRunTime
-            (Decode.at [ "metadata", "genres" ] (Decode.list Decode.string))
+            (Decode.at [ "metadata", "genres" ] (Decode.map Set.fromList (Decode.list Decode.string)))
             (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
             (Decode.maybe (Decode.map normalizeImdbRating (Decode.at [ "ratings", "rating" ] Decode.float)))
 
