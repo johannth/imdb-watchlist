@@ -7,6 +7,7 @@ import request from 'request';
 import cors from 'cors';
 import bluebird from 'bluebird';
 import redis from 'redis';
+import leven from 'leven';
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
@@ -79,9 +80,25 @@ const justwatchCacheKey = imdbId => {
   return `justwatch:${imdbId}`;
 };
 
+const findBestPossibleJustwatchResult = (title, year, results) => {
+  if (!results) {
+    return null;
+  }
+
+  return results.filter(result => {
+    const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
+    const nameAndYearMatch = titleMatch === 0 &&
+      result.original_release_year === year;
+    const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
+      result.original_release_year === year;
+    return nameAndYearMatch || fuzzyTitleAndYearMatch;
+  })[0];
+};
+
 app.get('/api/justwatch', (req, res) => {
   const imdbId = req.query.imdbId;
   const title = req.query.title;
+  const year = parseInt(req.query.year);
 
   getJsonFromCache(cache)(justwatchCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
@@ -106,9 +123,13 @@ app.get('/api/justwatch', (req, res) => {
         return response.json();
       })
       .then(json => {
-        const possibleItem = json.items && json.items[0];
+        const possibleItem = findBestPossibleJustwatchResult(
+          title,
+          year,
+          json.items
+        );
 
-        if (!possibleItem || possibleItem.title !== title) {
+        if (!possibleItem) {
           res.json({ data: null });
           return;
         }

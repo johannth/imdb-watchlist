@@ -3,6 +3,7 @@ module Api exposing (getWatchlistData, getBechdelData, getJustWatchData, getConf
 import Json.Decode as Decode
 import Http
 import Types exposing (..)
+import Date exposing (Date)
 
 
 apiUrl : String -> String -> String
@@ -27,10 +28,11 @@ decodeWatchlistRowIntoMovie =
         normalizeImdbRating rating =
             round (rating * 10)
     in
-        Decode.map6 WatchListMovie
+        Decode.map7 WatchListMovie
             (Decode.at [ "id" ] Decode.string)
             (Decode.at [ "primary", "title" ] Decode.string)
             decodeImdbUrl
+            decodeMovieReleaseDate
             decodeMovieRunTime
             (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
             (Decode.maybe (Decode.map normalizeImdbRating (Decode.at [ "ratings", "rating" ] Decode.float)))
@@ -40,6 +42,17 @@ decodeImdbUrl : Decode.Decoder String
 decodeImdbUrl =
     Decode.map (\path -> "http://www.imdb.com" ++ path)
         (Decode.at [ "primary", "href" ] Decode.string)
+
+
+
+-- metadata genres
+-- metadata release
+-- type
+
+
+decodeMovieReleaseDate : Decode.Decoder (Maybe Date)
+decodeMovieReleaseDate =
+    Decode.maybe (Decode.map Date.fromTime (Decode.at [ "metadata", "release" ] Decode.float))
 
 
 decodeMovieRunTime : Decode.Decoder (Maybe Int)
@@ -104,10 +117,17 @@ decodeBoolFromInt value =
 -- JUSTWATCH
 
 
-getJustWatchData : String -> String -> String -> Cmd Msg
-getJustWatchData apiHost imdbId title =
-    Http.send (LoadJustWatch imdbId) <|
-        Http.get (apiUrl apiHost ("/api/justwatch?imdbId=" ++ imdbId ++ "&title=" ++ title)) decodeJustWatchData
+getJustWatchData : String -> String -> String -> Maybe Int -> Cmd Msg
+getJustWatchData apiHost imdbId title year =
+    let
+        yearPart =
+            Maybe.withDefault "" (Maybe.map (\year -> "&year=" ++ toString year) year)
+
+        query =
+            "imdbId=" ++ imdbId ++ "&title=" ++ title ++ yearPart
+    in
+        Http.send (LoadJustWatch imdbId) <|
+            Http.get (apiUrl apiHost ("/api/justwatch?" ++ query)) decodeJustWatchData
 
 
 decodeJustWatchData : Decode.Decoder (Maybe JustWatchData)

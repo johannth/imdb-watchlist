@@ -9,6 +9,7 @@ import Html.Events
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Types exposing (..)
+import Date
 
 
 rootView : Model -> Html Msg
@@ -56,6 +57,7 @@ config =
         , toMsg = SetTableState
         , columns =
             [ movieTitleColumn
+            , releaseYearColumn
             , runTimeColumn
             , maybeIntColumn "Metascore" .metascore
             , maybeIntColumn "Tomatometer" .rottenTomatoesMeter
@@ -82,6 +84,15 @@ movieTitleColumn =
         , viewData = \movie -> linkCell movie.title movie.imdbUrl
         , sorter = Table.increasingOrDecreasingBy .title
         }
+
+
+releaseYearColumn : Table.Column Movie Msg
+releaseYearColumn =
+    let
+        extractYear movie =
+            Maybe.map Date.year movie.releaseDate
+    in
+        maybeIntColumn "Release Year" extractYear
 
 
 cellForOffer : Maybe JustWatchOffer -> Table.HtmlDetails Msg

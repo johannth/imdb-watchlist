@@ -4,6 +4,7 @@ import Table
 import Dict
 import Http
 import Navigation
+import Date exposing (Date)
 
 
 type alias Model =
@@ -43,6 +44,7 @@ type alias WatchListMovie =
     { id : String
     , title : String
     , imdbUrl : String
+    , releaseDate : Maybe Date
     , runTime : Maybe Int
     , metascore : Maybe Int
     , imdbRating : Maybe Int
@@ -53,6 +55,7 @@ type alias Movie =
     { id : String
     , title : String
     , imdbUrl : String
+    , releaseDate : Maybe Date
     , runTime : Maybe Int
     , metascore : Maybe Int
     , rottenTomatoesMeter : Maybe Int
@@ -70,6 +73,7 @@ watchListMovieToMovie watchListMovie =
     { id = watchListMovie.id
     , title = watchListMovie.title
     , imdbUrl = watchListMovie.imdbUrl
+    , releaseDate = watchListMovie.releaseDate
     , runTime = watchListMovie.runTime
     , metascore = watchListMovie.metascore
     , rottenTomatoesMeter = Maybe.Nothing
