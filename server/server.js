@@ -217,20 +217,18 @@ const netflixCacheKey = imdbId => {
   return `netflix:${imdbId}`;
 };
 
+//
 // We get Netflix urls from JustWatch which work for the U.S. Netflix.
 // Those won't necessary work on the Icelandic Netflix. The movie
 // seems to have the same ID though so we try to see if a localized
 // url returns 200.
 app.get('/api/netflix', (req, res) => {
   const imdbId = req.query.imdbId;
-  const netflixUrl = req.query.netflixUrl;
+  const title = req.query.title;
+  const year = parseInt(req.query.year || '0');
   const locale = req.query.locale;
-
-  if (!netflixUrl) {
-    console.log(`/api/netflix ${imdbId}: Not a valid netflix url`);
-    res.json({ data: null });
-    return;
-  }
+  var netflixUrl = req.query.netflixUrl &&
+    req.query.netflixUrl.replace('http://', 'https://');
 
   getJsonFromCache(cache)(netflixCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
@@ -239,11 +237,63 @@ app.get('/api/netflix', (req, res) => {
       return;
     }
 
-    const netflixUrlInLocale = netflixUrl
-      .replace('/title/', `/${locale}/title/`)
-      .replace('http://', 'https://');
+    if (netflixUrl) {
+      checkIfMovieIsAvailableOnNetflix(
+        imdbId,
+        netflixUrl,
+        locale
+      ).then(netflixUrl => {
+        const payload = { data: { netflixUrl: netflixUrl } };
 
-    const requestUrl = netflixUrl.replace('http://', 'https://');
+        saveJsonToCache(cache)(
+          netflixCacheKey(imdbId),
+          payload,
+          24 * 60 * 60
+        ).then(() => {
+          res.json(payload);
+        });
+      });
+    } else {
+      fetch(
+        `http://netflixroulette.net/api/api.php?title=${title}&year=${year}`
+      )
+        .then(response => {
+          if (!response.ok) {
+            return {};
+          }
+          return response.json();
+        })
+        .then(json => {
+          const possibleNetflixId = json.show_id;
+          if (possibleNetflixId) {
+            checkIfMovieIsAvailableOnNetflix(
+              imdbId,
+              `https://www.netflix.com/title/${possibleNetflixId}`,
+              locale
+            ).then(netflixUrl => {
+              const payload = { data: { netflixUrl: netflixUrl } };
+
+              saveJsonToCache(cache)(
+                netflixCacheKey(imdbId),
+                payload,
+                24 * 60 * 60
+              ).then(() => {
+                res.json(payload);
+              });
+            });
+          } else {
+            res.json({ data: null });
+          }
+        });
+    }
+  });
+});
+
+const checkIfMovieIsAvailableOnNetflix = (imdbId, netflixUrl, locale) => {
+  const netflixUrlInLocale = netflixUrl.replace('/title/', `/${locale}/title/`);
+
+  const requestUrl = netflixUrl;
+  return new Promise(function(resolve, reject) {
     request({ method: 'GET', followRedirect: false, url: requestUrl }, (
       error,
       response,
@@ -253,25 +303,15 @@ app.get('/api/netflix', (req, res) => {
       console.log(
         `/api/netflix ${imdbId}: Netflix returned ${response.statusCode} on ${requestUrl} with location ${locationHeader}`
       );
-      const payload = {
-        data: {
-          netflixUrl: response.statusCode == 200 ||
-            locationHeader === netflixUrlInLocale
-            ? netflixUrlInLocale
-            : null
-        }
-      };
 
-      saveJsonToCache(cache)(
-        netflixCacheKey(imdbId),
-        payload,
-        24 * 60 * 60
-      ).then(() => {
-        res.json(payload);
-      });
+      resolve(
+        response.statusCode == 200 || locationHeader === netflixUrlInLocale
+          ? netflixUrlInLocale
+          : null
+      );
     });
   });
-});
+};
 
 // process.env.PORT lets the port be set by Heroku
 const port = process.env.PORT || 8080;

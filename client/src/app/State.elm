@@ -120,12 +120,7 @@ update msg model =
                             Dict.insert imdbId updatedMovie model.movies
                     in
                         { model | movies = newMovies }
-                            ! case updatedMovie.netflix of
-                                Just netflixOffer ->
-                                    [ Api.getConfirmNetflixData model.apiHost imdbId (urlFromOffer netflixOffer) ]
-
-                                Nothing ->
-                                    []
+                            ! [ Api.getConfirmNetflixData model.apiHost imdbId updatedMovie.title (Maybe.map Date.year updatedMovie.releaseDate) (Maybe.map urlFromOffer updatedMovie.netflix) ]
 
                 _ ->
                     model ! []
@@ -140,11 +135,14 @@ update msg model =
                         updatedMovie =
                             { movie
                                 | netflix =
-                                    case maybeNetflixUrl of
-                                        Just netflixUrl ->
-                                            Maybe.map (updateUrl netflixUrl) movie.netflix
+                                    case ( maybeNetflixUrl, movie.netflix ) of
+                                        ( Just netflixUrl, Just netflixOffer ) ->
+                                            Maybe.Just (updateUrl netflixUrl netflixOffer)
 
-                                        Nothing ->
+                                        ( Just netflixUrl, Nothing ) ->
+                                            Maybe.Just (Flatrate Netflix netflixUrl HD)
+
+                                        ( _, _ ) ->
                                             Maybe.Nothing
                             }
                     in

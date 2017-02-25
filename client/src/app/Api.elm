@@ -234,10 +234,17 @@ decodeJustWatchScore =
 -- NETFLIX
 
 
-getConfirmNetflixData : String -> String -> String -> Cmd Msg
-getConfirmNetflixData apiHost imdbId netflixUrl =
-    Http.send (LoadConfirmNetflix imdbId) <|
-        Http.get (apiUrl apiHost ("/api/netflix?locale=is&imdbId=" ++ imdbId ++ "&netflixUrl=" ++ netflixUrl)) decodeConfirmNetflixData
+getConfirmNetflixData : String -> String -> String -> Maybe Int -> Maybe String -> Cmd Msg
+getConfirmNetflixData apiHost imdbId title year netflixUrl =
+    let
+        yearPart =
+            Maybe.withDefault "" (Maybe.map (\year -> "&year=" ++ (toString year)) year)
+
+        netflixUrlPart =
+            Maybe.withDefault "" (Maybe.map (\netflixUrl -> "&netflixUrl=" ++ netflixUrl) netflixUrl)
+    in
+        Http.send (LoadConfirmNetflix imdbId) <|
+            Http.get (apiUrl apiHost ("/api/netflix?locale=is&imdbId=" ++ imdbId ++ "&title=" ++ title ++ yearPart ++ netflixUrlPart)) decodeConfirmNetflixData
 
 
 decodeConfirmNetflixData : Decode.Decoder (Maybe String)
