@@ -28,14 +28,32 @@ decodeWatchlistRowIntoMovie =
         normalizeImdbRating rating =
             round (rating * 10)
     in
-        Decode.map7 WatchListMovie
+        Decode.map8 WatchListMovie
             (Decode.at [ "id" ] Decode.string)
             (Decode.at [ "primary", "title" ] Decode.string)
             decodeImdbUrl
+            decodeItemType
             decodeMovieReleaseDate
             decodeMovieRunTime
             (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
             (Decode.maybe (Decode.map normalizeImdbRating (Decode.at [ "ratings", "rating" ] Decode.float)))
+
+
+decodeItemType : Decode.Decoder MovieType
+decodeItemType =
+    Decode.map
+        (\value ->
+            case value of
+                "featureFilm" ->
+                    Film
+
+                "series" ->
+                    Series
+
+                _ ->
+                    Film
+        )
+        (Decode.at [ "type" ] Decode.string)
 
 
 decodeImdbUrl : Decode.Decoder String
@@ -45,9 +63,7 @@ decodeImdbUrl =
 
 
 
--- metadata genres
--- metadata release
--- type
+-- metadata genre
 
 
 decodeMovieReleaseDate : Decode.Decoder (Maybe Date)
@@ -117,14 +133,24 @@ decodeBoolFromInt value =
 -- JUSTWATCH
 
 
-getJustWatchData : String -> String -> String -> Maybe Int -> Cmd Msg
-getJustWatchData apiHost imdbId title year =
+getJustWatchData : String -> String -> String -> MovieType -> Maybe Int -> Cmd Msg
+getJustWatchData apiHost imdbId title itemType year =
     let
         yearPart =
             Maybe.withDefault "" (Maybe.map (\year -> "&year=" ++ toString year) year)
 
+        typePart =
+            "&type="
+                ++ (case itemType of
+                        Film ->
+                            "film"
+
+                        Series ->
+                            "series"
+                   )
+
         query =
-            "imdbId=" ++ imdbId ++ "&title=" ++ title ++ yearPart
+            "imdbId=" ++ imdbId ++ "&title=" ++ title ++ yearPart ++ typePart
     in
         Http.send (LoadJustWatch imdbId) <|
             Http.get (apiUrl apiHost ("/api/justwatch?" ++ query)) decodeJustWatchData

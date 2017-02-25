@@ -77,7 +77,7 @@ update msg model =
                     List.map (Api.getBechdelData model.apiHost) listOfIds
 
                 justWatchCommands =
-                    List.map (\movie -> Api.getJustWatchData model.apiHost movie.id movie.title (Maybe.map Date.year movie.releaseDate)) watchListMovies
+                    List.map (\movie -> Api.getJustWatchData model.apiHost movie.id movie.title movie.itemType (Maybe.map Date.year movie.releaseDate)) watchListMovies
             in
                 { model
                     | lists = Dict.insert imdbUserId listOfIds model.lists

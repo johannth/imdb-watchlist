@@ -40,10 +40,26 @@ emptyModel flags =
     }
 
 
+type MovieType
+    = Film
+    | Series
+
+
+movieTypetoString : MovieType -> String
+movieTypetoString itemType =
+    case itemType of
+        Film ->
+            "Film"
+
+        Series ->
+            "Series"
+
+
 type alias WatchListMovie =
     { id : String
     , title : String
     , imdbUrl : String
+    , itemType : MovieType
     , releaseDate : Maybe Date
     , runTime : Maybe Int
     , metascore : Maybe Int
@@ -55,6 +71,7 @@ type alias Movie =
     { id : String
     , title : String
     , imdbUrl : String
+    , itemType : MovieType
     , releaseDate : Maybe Date
     , runTime : Maybe Int
     , metascore : Maybe Int
@@ -73,6 +90,7 @@ watchListMovieToMovie watchListMovie =
     { id = watchListMovie.id
     , title = watchListMovie.title
     , imdbUrl = watchListMovie.imdbUrl
+    , itemType = watchListMovie.itemType
     , releaseDate = watchListMovie.releaseDate
     , runTime = watchListMovie.runTime
     , metascore = watchListMovie.metascore

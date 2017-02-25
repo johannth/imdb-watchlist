@@ -95,10 +95,20 @@ const findBestPossibleJustwatchResult = (title, year, results) => {
   })[0];
 };
 
+const justwatchType = itemType => {
+  switch (itemType) {
+    case 'film':
+      return 'movie';
+    case 'series':
+      return 'show';
+  }
+};
+
 app.get('/api/justwatch', (req, res) => {
   const imdbId = req.query.imdbId;
   const title = req.query.title;
-  const year = parseInt(req.query.year);
+  const type = req.query.type;
+  const year = parseInt(req.query.year || '0');
 
   getJsonFromCache(cache)(justwatchCacheKey(imdbId)).then(cachedResponse => {
     if (cachedResponse) {
@@ -110,7 +120,7 @@ app.get('/api/justwatch', (req, res) => {
     fetch('https://api.justwatch.com/titles/en_US/popular', {
       method: 'POST',
       body: JSON.stringify({
-        content_types: ['show', 'movie'],
+        content_types: [justwatchType(type)],
         query: title
       }),
       headers: {

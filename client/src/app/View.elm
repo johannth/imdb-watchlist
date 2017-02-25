@@ -57,6 +57,7 @@ config =
         , toMsg = SetTableState
         , columns =
             [ movieTitleColumn
+            , Table.stringColumn "Type" (.itemType >> movieTypetoString)
             , releaseYearColumn
             , runTimeColumn
             , maybeIntColumn "Metascore" .metascore
