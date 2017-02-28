@@ -290,9 +290,19 @@ calculatePriorityWithWeights weights movie =
 
 defaultPriorityWeights : PriorityWeights
 defaultPriorityWeights =
-    { runTime = 1 / 3
-    , metascore = 1 / 9
-    , tomatoMeter = 1 / 9
-    , imdbRating = 1 / 9
-    , bechdel = 1 / 3
-    }
+    let
+        runTimeWeight =
+            3 / 9
+
+        ratingWeight =
+            4 / 9
+
+        bechdelWeight =
+            2 / 9
+    in
+        { runTime = runTimeWeight
+        , metascore = ratingWeight / 3
+        , tomatoMeter = ratingWeight / 3
+        , imdbRating = ratingWeight / 3
+        , bechdel = bechdelWeight
+        }
