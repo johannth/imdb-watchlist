@@ -256,9 +256,7 @@ app.get('/api/netflix', (req, res) => {
         });
       });
     } else {
-      fetch(
-        `http://netflixroulette.net/api/api.php?title=${title}&year=${year}`
-      )
+      fetch(`http://denmark.flixlist.co/autocomplete/titles?q=${title}`)
         .then(response => {
           if (!response.ok) {
             return {};
@@ -266,7 +264,14 @@ app.get('/api/netflix', (req, res) => {
           return response.json();
         })
         .then(json => {
-          const possibleNetflixId = json.show_id;
+          const possibleNetflixId = json
+            .filter(result => {
+              return result.title === title; // This missing a check for year but it still much better than nothing.
+            })
+            .map(result => {
+              return result.url.replace('/titles/', '');
+            })[0];
+
           if (possibleNetflixId) {
             checkIfMovieIsAvailableOnNetflix(
               imdbId,
