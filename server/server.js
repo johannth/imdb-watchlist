@@ -256,7 +256,11 @@ app.get('/api/netflix', (req, res) => {
         });
       });
     } else {
-      fetch(`http://denmark.flixlist.co/autocomplete/titles?q=${title}`)
+      fetch(
+        `http://denmark.flixlist.co/autocomplete/titles?q=${encodeURIComponent(
+          title
+        )}`
+      )
         .then(response => {
           if (!response.ok) {
             return {};
