@@ -25,11 +25,8 @@ type Msg
     = Void
     | LookupWatchList String
     | ImdbUserIdInput String
-    | ReceivedWatchList String (List WatchListMovie)
+    | ReceivedWatchList String (List Movie)
     | ClearList String
-    | LoadBechdel String (Result Http.Error (Maybe BechdelRating))
-    | LoadJustWatch String (Result Http.Error (Maybe JustWatchData))
-    | LoadConfirmNetflix String (Result Http.Error (Maybe String))
     | SetTableState Table.State
     | UrlChange Navigation.Location
     | ToggleGenreFilter String
@@ -76,6 +73,22 @@ type alias WatchListMovie =
     }
 
 
+type alias ViewingOptions =
+    { netflix : Maybe JustWatchOffer
+    , hbo : Maybe JustWatchOffer
+    , itunes : Maybe JustWatchOffer
+    , amazon : Maybe JustWatchOffer
+    }
+
+
+type alias Ratings =
+    { metascore : Maybe Int
+    , rottenTomatoesMeter : Maybe Int
+    , imdbRating : Maybe Int
+    , bechdelRating : Maybe BechdelRating
+    }
+
+
 type alias Movie =
     { id : String
     , title : String
@@ -84,34 +97,8 @@ type alias Movie =
     , releaseDate : Maybe Date
     , runTime : Maybe Int
     , genres : Set String
-    , metascore : Maybe Int
-    , rottenTomatoesMeter : Maybe Int
-    , imdbRating : Maybe Int
-    , bechdelRating : Maybe BechdelRating
-    , netflix : Maybe JustWatchOffer
-    , hbo : Maybe JustWatchOffer
-    , itunes : Maybe JustWatchOffer
-    , amazon : Maybe JustWatchOffer
-    }
-
-
-watchListMovieToMovie : WatchListMovie -> Movie
-watchListMovieToMovie watchListMovie =
-    { id = watchListMovie.id
-    , title = watchListMovie.title
-    , imdbUrl = watchListMovie.imdbUrl
-    , itemType = watchListMovie.itemType
-    , releaseDate = watchListMovie.releaseDate
-    , runTime = watchListMovie.runTime
-    , genres = watchListMovie.genres
-    , metascore = watchListMovie.metascore
-    , rottenTomatoesMeter = Maybe.Nothing
-    , imdbRating = watchListMovie.imdbRating
-    , bechdelRating = Maybe.Nothing
-    , netflix = Maybe.Nothing
-    , hbo = Maybe.Nothing
-    , itunes = Maybe.Nothing
-    , amazon = Maybe.Nothing
+    , ratings : Ratings
+    , viewingOptions : ViewingOptions
     }
 
 

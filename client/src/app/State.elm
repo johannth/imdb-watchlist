@@ -71,7 +71,7 @@ update msg model =
                     List.map .id watchListMovies
 
                 newMovies =
-                    List.map (Utils.lift2 .id watchListMovieToMovie) watchListMovies
+                    List.map (Utils.lift2 .id identity) watchListMovies
                         |> Dict.fromList
 
                 -- bechdelCommands =
@@ -88,72 +88,6 @@ update msg model =
                     , genres = Set.union newGenres model.genres
                 }
                     ! []
-
-        LoadBechdel imdbId (Err error) ->
-            model ! []
-
-        LoadBechdel imdbId (Ok bechdelRating) ->
-            case Dict.get imdbId model.movies of
-                Just movie ->
-                    let
-                        updatedMovie =
-                            { movie | bechdelRating = bechdelRating }
-                    in
-                        { model | movies = Dict.insert imdbId updatedMovie model.movies } ! []
-
-                Nothing ->
-                    model ! []
-
-        LoadJustWatch imdbId (Err error) ->
-            model ! []
-
-        LoadJustWatch imdbId (Ok justWatchData) ->
-            case ( Dict.get imdbId model.movies, justWatchData ) of
-                ( Just movie, Just justWatchData ) ->
-                    let
-                        updatedMovie =
-                            { movie
-                                | rottenTomatoesMeter = Maybe.map round (extractScore "tomato:meter" justWatchData.scores)
-                                , netflix = extractBestOffer Netflix justWatchData.offers
-                                , hbo = extractBestOffer HBO justWatchData.offers
-                                , amazon = extractBestOffer Amazon justWatchData.offers
-                                , itunes = extractBestOffer ITunes justWatchData.offers
-                            }
-
-                        newMovies =
-                            Dict.insert imdbId updatedMovie model.movies
-                    in
-                        { model | movies = newMovies }
-                            ! [ Api.getConfirmNetflixData model.apiHost imdbId updatedMovie.title (Maybe.map Date.year updatedMovie.releaseDate) (Maybe.map urlFromOffer updatedMovie.netflix) ]
-
-                _ ->
-                    model ! []
-
-        LoadConfirmNetflix imdbId (Err error) ->
-            model ! []
-
-        LoadConfirmNetflix imdbId (Ok maybeNetflixUrl) ->
-            case Dict.get imdbId model.movies of
-                Just movie ->
-                    let
-                        updatedMovie =
-                            { movie
-                                | netflix =
-                                    case ( maybeNetflixUrl, movie.netflix ) of
-                                        ( Just netflixUrl, Just netflixOffer ) ->
-                                            Maybe.Just (updateUrl netflixUrl netflixOffer)
-
-                                        ( Just netflixUrl, Nothing ) ->
-                                            Maybe.Just (Flatrate Netflix netflixUrl HD)
-
-                                        ( _, _ ) ->
-                                            Maybe.Nothing
-                            }
-                    in
-                        { model | movies = Dict.insert imdbId updatedMovie model.movies } ! []
-
-                Nothing ->
-                    model ! []
 
         SetTableState newState ->
             { model | tableState = newState } ! []
@@ -213,9 +147,9 @@ extractScore provider scores =
 
 calculateStreamabilityWeight : Movie -> Float
 calculateStreamabilityWeight movie =
-    if List.any Utils.maybeHasValue [ movie.netflix, movie.hbo ] then
+    if List.any Utils.maybeHasValue [ movie.viewingOptions.netflix, movie.viewingOptions.hbo ] then
         1
-    else if List.any Utils.maybeHasValue [ movie.itunes, movie.amazon ] then
+    else if List.any Utils.maybeHasValue [ movie.viewingOptions.itunes, movie.viewingOptions.amazon ] then
         0.7
     else
         0.1
@@ -271,15 +205,15 @@ calculatePriorityWithWeights weights movie =
             normalizeRunTime (extractValueToFloat 90 movie.runTime)
 
         normalizedBechdel =
-            extractValueToFloat 50 (Maybe.map normalizeBechdel movie.bechdelRating)
+            extractValueToFloat 50 (Maybe.map normalizeBechdel movie.ratings.bechdelRating)
     in
         streamabilityWeight
             * (weights.metascore
-                * (extractValueToFloat 50 movie.metascore)
+                * (extractValueToFloat 50 movie.ratings.metascore)
                 + weights.tomatoMeter
-                * (extractValueToFloat 50 movie.rottenTomatoesMeter)
+                * (extractValueToFloat 50 movie.ratings.rottenTomatoesMeter)
                 + weights.imdbRating
-                * (extractValueToFloat 50 movie.imdbRating)
+                * (extractValueToFloat 50 movie.ratings.imdbRating)
                 + weights.bechdel
                 * normalizedBechdel
                 + weights.runTime

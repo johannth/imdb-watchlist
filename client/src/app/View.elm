@@ -94,14 +94,14 @@ config =
             , Table.stringColumn "Genres" (.genres >> Set.toList >> List.sort >> (String.join ", "))
             , releaseYearColumn
             , runTimeColumn
-            , maybeIntColumn "Metascore" .metascore
-            , maybeIntColumn "Tomatometer" .rottenTomatoesMeter
-            , maybeIntColumn "Imdb Rating" .imdbRating
+            , maybeIntColumn "Metascore" (.ratings >> .metascore)
+            , maybeIntColumn "Tomatometer" (.ratings >> .rottenTomatoesMeter)
+            , maybeIntColumn "Imdb Rating" (.ratings >> .imdbRating)
             , bechdelColumn
-            , streamColumn "Netflix" .netflix
-            , streamColumn "HBO" .hbo
-            , streamColumn "Amazon" .amazon
-            , streamColumn "iTunes" .itunes
+            , streamColumn "Netflix" (.viewingOptions >> .netflix)
+            , streamColumn "HBO" (.viewingOptions >> .hbo)
+            , streamColumn "Amazon" (.viewingOptions >> .amazon)
+            , streamColumn "iTunes" (.viewingOptions >> .itunes)
             , priorityColumn
             ]
         }
@@ -236,7 +236,7 @@ bechdelColumn : Table.Column Movie Msg
 bechdelColumn =
     let
         accessor =
-            \movie -> Maybe.map State.normalizeBechdel movie.bechdelRating
+            \movie -> Maybe.map State.normalizeBechdel movie.ratings.bechdelRating
 
         extractWithDefault movie =
             Maybe.withDefault -1 (accessor movie)
@@ -250,7 +250,7 @@ bechdelColumn =
 
 bechdelTooltip : Movie -> String
 bechdelTooltip movie =
-    case movie.bechdelRating of
+    case movie.ratings.bechdelRating of
         Just bechdel ->
             let
                 prefixWithDubious string =

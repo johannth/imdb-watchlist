@@ -38,6 +38,9 @@ app.ws('/stream', (ws, req) => {
           );
         });
       }
+      case 'movie': {
+        const { imdbId } = message.body;
+      }
     }
   });
 });
@@ -85,7 +88,8 @@ const fetchWatchList = userId => {
       })
         .then(response => response.json())
         .then(movieData => {
-          const movies = movieIds.map(movieId => movieData[movieId].title);
+          const movies = movieIds.map(movieId =>
+            convertImdbMovieToMovie(movieData[movieId].title));
 
           return {
             id: watchlistData.list.id,
@@ -95,47 +99,106 @@ const fetchWatchList = userId => {
         });
     });
 };
-//
-// app.get('/api/watchlist', (req, res) => {
-//   fetchWatchList(req.query.userId).then(list => res.json({ list }));
-// });
-//
-// const justwatchCacheKey = imdbId => {
-//   return `justwatch:${imdbId}`;
-// };
-//
-// const findBestPossibleJustwatchResult = (title, year, type, results) => {
-//   if (!results) {
-//     return null;
-//   }
-//
-//   return results.filter(result => {
-//     const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
-//     const titleAndYearMatch = titleMatch === 0 &&
-//       result.original_release_year === year;
-//     const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
-//       result.original_release_year === year;
-//     const titleMatchesForSeries = titleMatch === 0 && type === 'series';
-//     return titleAndYearMatch || fuzzyTitleAndYearMatch || titleMatchesForSeries;
-//   })[0];
-// };
-//
-// const justwatchType = itemType => {
-//   switch (itemType) {
-//     case 'film':
-//       return 'movie';
-//     case 'series':
-//       return 'show';
-//   }
-// };
-//
-// app.get('/api/justwatch', (req, res) => {
-//   const imdbId = req.query.imdbId;
-//   const title = req.query.title;
-//   const type = req.query.type;
-//   const year = parseInt(req.query.year || '0');
-//
-//   getJsonFromCache(cache)(justwatchCacheKey(imdbId)).then(cachedResponse => {
+
+const calculateMovieRunTime = imdbMovieData => {
+  const numberOfEpisodes = imdbMovieData.metadata.numberOfEpisodes || 1;
+  const runTimeInSeconds = imdbMovieData.metadata.runtime;
+  return runTimeInSeconds ? runTimeInSeconds * numberOfEpisodes / 60 : null;
+};
+
+const convertImdbMovieToMovie = imdbMovieData => {
+  return movieData({
+    id: imdbMovieData.id,
+    title: imdbMovieData.primary.title,
+    imdbUrl: `http://www.imdb.com${imdbMovieData.primary.href}`,
+    type: imdbMovieData.type,
+    releaseDate: imdbMovieData.metadata.release,
+    runTime: calculateMovieRunTime(imdbMovieData),
+    genres: imdbMovieData.metadata.genres,
+    metascore: imdbMovieData.ratings.metascore,
+    imdbRating: imdbMovieData.ratings.rating * 10,
+  });
+};
+
+const movieData = (
+  {
+    id,
+    title,
+    imdbUrl,
+    type,
+    releaseDate,
+    runTime,
+    genres,
+    metascore,
+    rottenTomatoesMeter,
+    imdbRating,
+    bechdelRating,
+    netflix,
+    hbo,
+    itunes,
+    amazon,
+  }
+) => {
+  return {
+    id,
+    title,
+    imdbUrl,
+    type,
+    releaseDate,
+    runTime,
+    genres,
+    ratings: {
+      metascore,
+      rottenTomatoesMeter,
+      imdbRating,
+      bechdelRating,
+    },
+    viewingOptions: {
+      netflix,
+      hbo,
+      itunes,
+      amazon,
+    },
+  };
+};
+
+const justwatchCacheKey = imdbId => {
+  return `justwatch:${imdbId}`;
+};
+
+const findBestPossibleJustwatchResult = (title, year, type, results) => {
+  if (!results) {
+    return null;
+  }
+
+  return results.filter(result => {
+    const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
+    const titleAndYearMatch = titleMatch === 0 &&
+      result.original_release_year === year;
+    const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
+      result.original_release_year === year;
+    const titleMatchesForSeries = titleMatch === 0 && type === 'series';
+    return titleAndYearMatch || fuzzyTitleAndYearMatch || titleMatchesForSeries;
+  })[0];
+};
+
+const justwatchType = itemType => {
+  switch (itemType) {
+    case 'film':
+      return 'movie';
+    case 'series':
+      return 'show';
+  }
+};
+
+// const fetchMovieDetails = (imdbId) => {
+//   Promise.all([fetch])
+// }
+
+// const fetchJustWatchData = (imdbId, title, type, year) => {
+//   return getJsonFromCache(cache)(
+//     justwatchCacheKey(imdbId)
+//   ).then(cachedResponse => {
 //     if (cachedResponse) {
 //       console.log(`/api/justwatch ${imdbId}: Serving from cache`);
 //       res.json(cachedResponse);
@@ -190,6 +253,13 @@ const fetchWatchList = userId => {
 //         });
 //       });
 //   });
+// };
+//
+// app.get('/api/justwatch', (req, res) => {
+//   const imdbId = req.query.imdbId;
+//   const title = req.query.title;
+//   const type = req.query.type;
+//   const year = parseInt(req.query.year || '0');
 // });
 //
 // const bechdelCacheKey = imdbId => {
