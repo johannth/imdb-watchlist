@@ -6,6 +6,7 @@ import Http
 import Navigation
 import Date exposing (Date)
 import Set exposing (Set)
+import Json.Decode as Decode
 
 
 type alias Model =
@@ -21,9 +22,10 @@ type alias Model =
 
 
 type Msg
-    = LookupWatchList String
+    = Void
+    | LookupWatchList String
     | ImdbUserIdInput String
-    | LoadWatchList String (Result Http.Error (List WatchListMovie))
+    | ReceivedWatchList String (List WatchListMovie)
     | ClearList String
     | LoadBechdel String (Result Http.Error (Maybe BechdelRating))
     | LoadJustWatch String (Result Http.Error (Maybe JustWatchData))

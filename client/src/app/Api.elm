@@ -1,4 +1,4 @@
-module Api exposing (getWatchlistData, getBechdelData, getJustWatchData, getConfirmNetflixData)
+module Api exposing (getWatchlistData, subscriptions, getBechdelData, getJustWatchData, getConfirmNetflixData)
 
 import Json.Decode as Decode
 import Http
@@ -6,6 +6,63 @@ import Types exposing (..)
 import Date exposing (Date)
 import Utils exposing (map9)
 import Set
+import WebSocket
+import Json.Encode as Encode
+
+
+type alias ApiPayload =
+    { payloadType : String
+    , body : Decode.Value
+    }
+
+
+type alias WatchlistPayload =
+    { userId : String
+    , movies : List WatchListMovie
+    }
+
+
+decodePayload : String -> Maybe ApiPayload
+decodePayload encodedPayload =
+    let
+        basePayloadDecoder =
+            Decode.map2 ApiPayload
+                (Decode.field "type" Decode.string)
+                (Decode.field "body" Decode.value)
+    in
+        Decode.decodeString basePayloadDecoder encodedPayload |> Result.toMaybe
+
+
+decodeWatchlistPayload : Decode.Decoder WatchlistPayload
+decodeWatchlistPayload =
+    Decode.map2 WatchlistPayload
+        (Decode.field "userId" Decode.string)
+        decodeWatchlist
+
+
+handlePayload : String -> Msg
+handlePayload encodedPayload =
+    case decodePayload encodedPayload of
+        Just payload ->
+            case payload.payloadType of
+                "watchlist" ->
+                    case Decode.decodeValue decodeWatchlistPayload payload.body of
+                        Ok payload ->
+                            ReceivedWatchList payload.userId payload.movies
+
+                        _ ->
+                            Void
+
+                _ ->
+                    Void
+
+        _ ->
+            Void
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    WebSocket.listen (websocketsUrl model.apiHost) handlePayload
 
 
 apiUrl : String -> String -> String
@@ -13,10 +70,23 @@ apiUrl apiHost path =
     apiHost ++ path
 
 
+websocketsUrl : String -> String
+websocketsUrl apiHost =
+    "ws://" ++ apiHost ++ "/stream"
+
+
+websocketRequest : String -> String -> List ( String, Encode.Value ) -> Cmd Msg
+websocketRequest apiHost messageType messageBody =
+    let
+        encodedMessageBody =
+            Encode.object [ ( "type", Encode.string messageType ), ( "body", Encode.object messageBody ) ]
+    in
+        WebSocket.send (websocketsUrl apiHost) (Encode.encode 0 encodedMessageBody)
+
+
 getWatchlistData : String -> String -> Cmd Msg
 getWatchlistData apiHost imdbUserId =
-    Http.send (LoadWatchList imdbUserId) <|
-        Http.get (apiUrl apiHost ("/api/watchlist?userId=" ++ imdbUserId)) decodeWatchlist
+    websocketRequest apiHost "watchlist" [ ( "userId", Encode.string imdbUserId ) ]
 
 
 decodeWatchlist : Decode.Decoder (List WatchListMovie)

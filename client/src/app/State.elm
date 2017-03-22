@@ -41,6 +41,9 @@ updatedUrl model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Void ->
+            model ! []
+
         ImdbUserIdInput partialImdbUserId ->
             { model | imdbUserIdInputCurrentValue = partialImdbUserId } ! []
 
@@ -62,10 +65,7 @@ update msg model =
             in
                 newModel ! [ Navigation.modifyUrl (updatedUrl newModel) ]
 
-        LoadWatchList imdbUserId (Err error) ->
-            model ! []
-
-        LoadWatchList imdbUserId (Ok watchListMovies) ->
+        ReceivedWatchList imdbUserId watchListMovies ->
             let
                 listOfIds =
                     List.map .id watchListMovies
@@ -74,12 +74,11 @@ update msg model =
                     List.map (Utils.lift2 .id watchListMovieToMovie) watchListMovies
                         |> Dict.fromList
 
-                bechdelCommands =
-                    List.map (Api.getBechdelData model.apiHost) listOfIds
-
-                justWatchCommands =
-                    List.map (\movie -> Api.getJustWatchData model.apiHost movie.id movie.title movie.itemType (Maybe.map Date.year movie.releaseDate)) watchListMovies
-
+                -- bechdelCommands =
+                --     List.map (Api.getBechdelData model.apiHost) listOfIds
+                --
+                -- justWatchCommands =
+                --     List.map (\movie -> Api.getJustWatchData model.apiHost movie.id movie.title movie.itemType (Maybe.map Date.year movie.releaseDate)) watchListMovies
                 newGenres =
                     List.foldl Set.union Set.empty (List.map .genres (Dict.values newMovies))
             in
@@ -88,7 +87,7 @@ update msg model =
                     , movies = Dict.union newMovies model.movies
                     , genres = Set.union newGenres model.genres
                 }
-                    ! (justWatchCommands ++ bechdelCommands)
+                    ! []
 
         LoadBechdel imdbId (Err error) ->
             model ! []

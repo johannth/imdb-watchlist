@@ -22,6 +22,7 @@
     "cheerio": "^0.22.0",
     "cors": "^2.8.1",
     "express": "^4.14.1",
+    "express-ws": "^3.0.0",
     "leven": "^2.1.0",
     "newrelic": "^1.37.2",
     "node-fetch": "^1.6.3",
