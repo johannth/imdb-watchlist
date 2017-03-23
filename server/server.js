@@ -50,13 +50,6 @@ app.ws('/stream', (ws, req) => {
   });
 });
 
-const handleErrors = response => {
-  if (!response.ok) {
-    throw Error(response.statusText);
-  }
-  return response;
-};
-
 const getJsonFromCache = cache =>
   key => {
     if (process.env.DISABLE_CACHE) {
@@ -175,9 +168,16 @@ const movieData = (
 const fetchWithCache = (url, options, expiryInSeconds) => {
   const cacheKey = `request:${url}:${JSON.stringify(options)}`;
   const promiseBuilder = () =>
-    fetch(url, options).then(response => {
-      return response.json();
-    });
+    fetch(url, options)
+      .then(response => {
+        if (!response.ok) {
+          throw Error(response.statusText);
+        }
+        return response;
+      })
+      .then(response => {
+        return response.json();
+      });
 
   return cachePromise(cacheKey, promiseBuilder, expiryInSeconds);
 };
@@ -197,24 +197,32 @@ const cachePromise = (key, promiseBuilder, expiryInSeconds) => {
 
 const fetchMovieDetails = movie => {
   return Promise.all([
-    fetchBechdel(movie.id).catch(error => null),
+    fetchBechdel(movie.id).catch(error => {
+      console.error('Bechdel', error);
+      return null;
+    }),
     fetchJustWatchData(
       movie.id,
       movie.title,
       movie.type,
       movie.releaseDate
     ).catch(error => {
-      console.log(error);
-      return { viewingOptions: null };
+      console.error('JustWatch', error);
+      return { viewingOptions: null, ratings: null };
     }),
     checkIfMovieIsOnLocalNetflix(movie.id, movie.title).catch(error => {
-      console.log(error);
+      console.error('Netflix', error);
       return { netflixUrl: null };
     }),
   ])
     .then(bechdelRating_justWatch_localNetflixUrl => {
       const bechdelRating = bechdelRating_justWatch_localNetflixUrl[0];
-      const { viewingOptions } = bechdelRating_justWatch_localNetflixUrl[1];
+
+      const {
+        viewingOptions,
+        ratings,
+      } = bechdelRating_justWatch_localNetflixUrl[1];
+
       const { netflixUrl } = bechdelRating_justWatch_localNetflixUrl[2];
       const netflix = netflixUrl
         ? offerData({
@@ -231,6 +239,7 @@ const fetchMovieDetails = movie => {
         metascore: movie.ratings.metascore,
         bechdelRating,
         netflix,
+        rottenTomatoesMeter: ratings && ratings.rottenTomatoesMeter,
         amazon: viewingOptions && viewingOptions.amazon,
         itunes: viewingOptions && viewingOptions.itunes,
         hbo: viewingOptions && viewingOptions.hbo,
@@ -263,7 +272,11 @@ const fetchBechdel = imdbId => {
       return json;
     })
     .then(json => {
-      return { rating: parseInt(json.rating), dubious: json.dubious === '1' };
+      if (json) {
+        return { rating: parseInt(json.rating), dubious: json.dubious === '1' };
+      } else {
+        return null;
+      }
     });
 };
 
@@ -378,7 +391,7 @@ const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) => {
     );
 
     if (!possibleItem) {
-      return { viewingOptions: null };
+      return { viewingOptions: null, ratings: null };
     }
 
     const item = possibleItem;
@@ -403,12 +416,19 @@ const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) => {
 
     const scoring = item.scoring;
 
+    const rottenTomatoesMeter = scoring
+      .filter(score => score.provider_type === 'tomato:meter')
+      .map(score => score.value)[0];
+
     return {
       viewingOptions: {
         netflix,
         amazon,
         hbo,
         itunes,
+      },
+      ratings: {
+        rottenTomatoesMeter,
       },
     };
   });
