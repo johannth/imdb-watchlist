@@ -23,9 +23,10 @@ type alias Model =
 
 type Msg
     = Void
-    | LookupWatchList String
     | ImdbUserIdInput String
+    | LookupWatchList String
     | ReceivedWatchList String (List Movie)
+    | ReceivedMovie Movie
     | ClearList String
     | SetTableState Table.State
     | UrlChange Navigation.Location
@@ -60,19 +61,6 @@ movieTypetoString itemType =
             "Series"
 
 
-type alias WatchListMovie =
-    { id : String
-    , title : String
-    , imdbUrl : String
-    , itemType : MovieType
-    , releaseDate : Maybe Date
-    , runTime : Maybe Int
-    , genres : Set String
-    , metascore : Maybe Int
-    , imdbRating : Maybe Int
-    }
-
-
 type alias ViewingOptions =
     { netflix : Maybe JustWatchOffer
     , hbo : Maybe JustWatchOffer
@@ -84,8 +72,8 @@ type alias ViewingOptions =
 type alias Ratings =
     { metascore : Maybe Int
     , rottenTomatoesMeter : Maybe Int
-    , imdbRating : Maybe Int
-    , bechdelRating : Maybe BechdelRating
+    , imdb : Maybe Int
+    , bechdel : Maybe BechdelRating
     }
 
 

@@ -96,7 +96,7 @@ config =
             , runTimeColumn
             , maybeIntColumn "Metascore" (.ratings >> .metascore)
             , maybeIntColumn "Tomatometer" (.ratings >> .rottenTomatoesMeter)
-            , maybeIntColumn "Imdb Rating" (.ratings >> .imdbRating)
+            , maybeIntColumn "Imdb Rating" (.ratings >> .imdb)
             , bechdelColumn
             , streamColumn "Netflix" (.viewingOptions >> .netflix)
             , streamColumn "HBO" (.viewingOptions >> .hbo)
@@ -236,7 +236,7 @@ bechdelColumn : Table.Column Movie Msg
 bechdelColumn =
     let
         accessor =
-            \movie -> Maybe.map State.normalizeBechdel movie.ratings.bechdelRating
+            \movie -> Maybe.map State.normalizeBechdel movie.ratings.bechdel
 
         extractWithDefault movie =
             Maybe.withDefault -1 (accessor movie)
@@ -250,7 +250,7 @@ bechdelColumn =
 
 bechdelTooltip : Movie -> String
 bechdelTooltip movie =
-    case movie.ratings.bechdelRating of
+    case movie.ratings.bechdel of
         Just bechdel ->
             let
                 prefixWithDubious string =

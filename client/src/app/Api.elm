@@ -1,4 +1,4 @@
-module Api exposing (getWatchlistData, subscriptions)
+module Api exposing (getWatchlistData, getDetailedMovieData, subscriptions)
 
 import Json.Decode as Decode
 import Http
@@ -50,7 +50,15 @@ handlePayload encodedPayload =
                         Ok payload ->
                             ReceivedWatchList payload.userId payload.movies
 
-                        _ ->
+                        Err error ->
+                            Void
+
+                "movie" ->
+                    case Decode.decodeValue (Decode.field "movie" decodeMovie) payload.body of
+                        Ok movie ->
+                            ReceivedMovie movie
+
+                        Err error ->
                             Void
 
                 _ ->
@@ -63,11 +71,6 @@ handlePayload encodedPayload =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     WebSocket.listen (websocketsUrl model.apiHost) handlePayload
-
-
-apiUrl : String -> String -> String
-apiUrl apiHost path =
-    apiHost ++ path
 
 
 websocketsUrl : String -> String
@@ -87,6 +90,40 @@ websocketRequest apiHost messageType messageBody =
 getWatchlistData : String -> String -> Cmd Msg
 getWatchlistData apiHost imdbUserId =
     websocketRequest apiHost "watchlist" [ ( "userId", Encode.string imdbUserId ) ]
+
+
+encodedMovie : Movie -> Encode.Value
+encodedMovie movie =
+    Encode.object
+        [ ( "id", Encode.string movie.id )
+        , ( "title", Encode.string movie.title )
+        , ( "imdbUrl", Encode.string movie.imdbUrl )
+        , ( "type", Encode.string (movieTypetoString movie.itemType) )
+        , ( "releaseDate"
+          , case movie.releaseDate of
+                Just releaseDate ->
+                    Encode.float (Date.toTime releaseDate)
+
+                Nothing ->
+                    Encode.null
+          )
+        , ( "runTime"
+          , case movie.runTime of
+                Just runTime ->
+                    Encode.int runTime
+
+                Nothing ->
+                    Encode.null
+          )
+        , ( "genres", Encode.list (List.map Encode.string (Set.toList movie.genres)) )
+        , ( "ratings", Encode.null )
+        , ( "viewingOptions", Encode.null )
+        ]
+
+
+getDetailedMovieData : String -> Movie -> Cmd Msg
+getDetailedMovieData apiHost movie =
+    websocketRequest apiHost "movie" [ ( "movie", encodedMovie movie ) ]
 
 
 decodeWatchlist : Decode.Decoder (List Movie)
@@ -136,53 +173,18 @@ decodeRatings =
         (Decode.maybe (Decode.field "metascore" Decode.int))
         (Decode.maybe (Decode.field "rottenTomatoesMeter" Decode.int))
         (Decode.maybe (Decode.field "imdbRating" Decode.int))
-        (Decode.succeed Nothing)
+        (Decode.maybe (Decode.field "bechdel" decodeBechdel))
+
+
+decodeBechdel : Decode.Decoder BechdelRating
+decodeBechdel =
+    (Decode.map2 BechdelRating
+        (Decode.field "rating" Decode.int)
+        (Decode.field "dubious" Decode.bool)
+    )
 
 
 
---
--- -- BECHDEL
---
---
--- getBechdelData : String -> String -> Cmd Msg
--- getBechdelData apiHost imdbId =
---     Http.send (LoadBechdel imdbId) <|
---         Http.get (apiUrl apiHost ("/api/bechdel?imdbId=" ++ imdbId)) decodeBechdel
---
---
--- decodeBechdel : Decode.Decoder (Maybe BechdelRating)
--- decodeBechdel =
---     Decode.maybe
---         (Decode.map2 BechdelRating
---             (Decode.at [ "data", "rating" ] (Decode.string |> Decode.andThen decodeIntFromString))
---             (Decode.at [ "data", "dubious" ] (Decode.string |> Decode.andThen decodeBoolFromInt))
---         )
---
---
--- decodeIntFromString : String -> Decode.Decoder Int
--- decodeIntFromString value =
---     case String.toInt value of
---         Ok valueAsInt ->
---             Decode.succeed valueAsInt
---
---         Err message ->
---             Decode.fail message
---
---
--- decodeBoolFromInt : String -> Decode.Decoder Bool
--- decodeBoolFromInt value =
---     case value of
---         "0" ->
---             Decode.succeed False
---
---         "1" ->
---             Decode.succeed True
---
---         _ ->
---             Decode.fail ("Unable to decode Bool from value: " ++ (toString value))
---
---
---
 -- -- JUSTWATCH
 --
 --

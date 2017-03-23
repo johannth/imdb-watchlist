@@ -65,20 +65,15 @@ update msg model =
             in
                 newModel ! [ Navigation.modifyUrl (updatedUrl newModel) ]
 
-        ReceivedWatchList imdbUserId watchListMovies ->
+        ReceivedWatchList imdbUserId movies ->
             let
                 listOfIds =
-                    List.map .id watchListMovies
+                    List.map .id movies
 
                 newMovies =
-                    List.map (Utils.lift2 .id identity) watchListMovies
+                    List.map (Utils.lift2 .id identity) movies
                         |> Dict.fromList
 
-                -- bechdelCommands =
-                --     List.map (Api.getBechdelData model.apiHost) listOfIds
-                --
-                -- justWatchCommands =
-                --     List.map (\movie -> Api.getJustWatchData model.apiHost movie.id movie.title movie.itemType (Maybe.map Date.year movie.releaseDate)) watchListMovies
                 newGenres =
                     List.foldl Set.union Set.empty (List.map .genres (Dict.values newMovies))
             in
@@ -87,7 +82,10 @@ update msg model =
                     , movies = Dict.union newMovies model.movies
                     , genres = Set.union newGenres model.genres
                 }
-                    ! []
+                    ! List.map (Api.getDetailedMovieData model.apiHost) (Dict.values newMovies)
+
+        ReceivedMovie movie ->
+            { model | movies = Dict.insert movie.id movie model.movies } ! []
 
         SetTableState newState ->
             { model | tableState = newState } ! []
@@ -205,7 +203,7 @@ calculatePriorityWithWeights weights movie =
             normalizeRunTime (extractValueToFloat 90 movie.runTime)
 
         normalizedBechdel =
-            extractValueToFloat 50 (Maybe.map normalizeBechdel movie.ratings.bechdelRating)
+            extractValueToFloat 50 (Maybe.map normalizeBechdel movie.ratings.bechdel)
     in
         streamabilityWeight
             * (weights.metascore
@@ -213,7 +211,7 @@ calculatePriorityWithWeights weights movie =
                 + weights.tomatoMeter
                 * (extractValueToFloat 50 movie.ratings.rottenTomatoesMeter)
                 + weights.imdbRating
-                * (extractValueToFloat 50 movie.ratings.imdbRating)
+                * (extractValueToFloat 50 movie.ratings.imdb)
                 + weights.bechdel
                 * normalizedBechdel
                 + weights.runTime

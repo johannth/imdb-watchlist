@@ -37,9 +37,14 @@ app.ws('/stream', (ws, req) => {
             JSON.stringify({ type: message.type, body: { userId, list } })
           );
         });
+        break;
       }
       case 'movie': {
-        const { imdbId } = message.body;
+        const { movie } = message.body;
+        fetchMovieDetails(movie).then(movie => {
+          ws.send(JSON.stringify({ type: message.type, body: { movie } }));
+        });
+        break;
       }
     }
   });
@@ -150,8 +155,8 @@ const movieData = (
     ratings: {
       metascore,
       rottenTomatoesMeter,
-      imdbRating,
-      bechdelRating,
+      imdb: imdbRating,
+      bechdel: bechdelRating,
     },
     viewingOptions: {
       netflix,
@@ -162,38 +167,90 @@ const movieData = (
   };
 };
 
-const justwatchCacheKey = imdbId => {
-  return `justwatch:${imdbId}`;
+const fetchWithCache = (url, options, expiryInSeconds) => {
+  const cacheKey = `request:${url}`;
+  return getJsonFromCache(cache)(cacheKey).then(cachedResponse => {
+    if (cachedResponse) {
+      console.log(`${url}: Serving from cache`);
+      return cachedResponse;
+    }
+
+    console.log(`${url}: Fetching...`);
+    return fetch(url, options)
+      .then(response => response.json())
+      .then(json =>
+        saveJsonToCache(cache)(cacheKey, json, expiryInSeconds).then(
+          () => json
+        ));
+  });
 };
 
-const findBestPossibleJustwatchResult = (title, year, type, results) => {
-  if (!results) {
-    return null;
-  }
-
-  return results.filter(result => {
-    const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
-    const titleAndYearMatch = titleMatch === 0 &&
-      result.original_release_year === year;
-    const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
-      result.original_release_year === year;
-    const titleMatchesForSeries = titleMatch === 0 && type === 'series';
-    return titleAndYearMatch || fuzzyTitleAndYearMatch || titleMatchesForSeries;
-  })[0];
+const fetchMovieDetails = movie => {
+  return Promise.all([
+    fetchBechdel(movie.id).catch(error => null),
+  ]).then(bechdelRating_ => {
+    const bechdelRating = bechdelRating_[0];
+    return movieData({
+      ...movie,
+      bechdelRating,
+    });
+  });
 };
 
-const justwatchType = itemType => {
-  switch (itemType) {
-    case 'film':
-      return 'movie';
-    case 'series':
-      return 'show';
-  }
-};
+const fetchBechdel = imdbId => {
+  const imdbIdWithoutPrefix = imdbId.replace('tt', '');
+  const url = `http://bechdeltest.com/api/v1/getMovieByImdbId?imdbid=${imdbIdWithoutPrefix}`;
 
-// const fetchMovieDetails = (imdbId) => {
-//   Promise.all([fetch])
-// }
+  return fetchWithCache(
+    url,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Content-Type': 'application/json',
+      },
+    },
+    30 * 24 * 60 * 60
+  )
+    .then(json => {
+      if (json.status) {
+        return null;
+      }
+      return json;
+    })
+    .then(json => {
+      return { rating: parseInt(json.rating), dubious: json.dubious === '1' };
+    });
+};
+//
+// const justwatchCacheKey = imdbId => {
+//   return `justwatch:${imdbId}`;
+// };
+//
+// const findBestPossibleJustwatchResult = (title, year, type, results) => {
+//   if (!results) {
+//     return null;
+//   }
+//
+//   return results.filter(result => {
+//     const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
+//     const titleAndYearMatch = titleMatch === 0 &&
+//       result.original_release_year === year;
+//     const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
+//       result.original_release_year === year;
+//     const titleMatchesForSeries = titleMatch === 0 && type === 'series';
+//     return titleAndYearMatch || fuzzyTitleAndYearMatch || titleMatchesForSeries;
+//   })[0];
+// };
+//
+// const justwatchType = itemType => {
+//   switch (itemType) {
+//     case 'film':
+//       return 'movie';
+//     case 'series':
+//       return 'show';
+//   }
+// };
 
 // const fetchJustWatchData = (imdbId, title, type, year) => {
 //   return getJsonFromCache(cache)(
@@ -262,53 +319,7 @@ const justwatchType = itemType => {
 //   const year = parseInt(req.query.year || '0');
 // });
 //
-// const bechdelCacheKey = imdbId => {
-//   return `bechdel:${imdbId}`;
-// };
-//
-// app.get('/api/bechdel', (req, res) => {
-//   const imdbId = req.query.imdbId;
-//   getJsonFromCache(cache)(bechdelCacheKey(imdbId)).then(cachedResponse => {
-//     if (cachedResponse) {
-//       console.log(`/api/bechdel ${imdbId}: Serving from cache`);
-//       res.json(cachedResponse);
-//       return;
-//     }
-//
-//     const imdbIdWithoutPrefix = imdbId.replace('tt', '');
-//     const url = `http://bechdeltest.com/api/v1/getMovieByImdbId?imdbid=${imdbIdWithoutPrefix}`;
-//
-//     fetch(url, {
-//       method: 'GET',
-//       headers: {
-//         Accept: 'application/json, text/plain, */*',
-//         'Content-Type': 'application/json',
-//       },
-//     })
-//       .then(handleErrors)
-//       .then(response => {
-//         return response.json();
-//       })
-//       .then(json => {
-//         if (json.status) {
-//           return null;
-//         }
-//         return json;
-//       })
-//       .then(json => {
-//         const response = { data: json };
-//
-//         saveJsonToCache(cache)(
-//           bechdelCacheKey(imdbId),
-//           response,
-//           30 * 24 * 60 * 60
-//         ).then(() => {
-//           res.json(response);
-//         });
-//       });
-//   });
-// });
-//
+
 // const netflixCacheKey = imdbId => {
 //   return `netflix:${imdbId}`;
 // };
