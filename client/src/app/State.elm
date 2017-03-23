@@ -80,7 +80,7 @@ update msg model =
                     List.foldl Set.union Set.empty (List.map .genres (Dict.values newMovies))
 
                 batchesOfMovies =
-                    Utils.batches 25 (Dict.values newMovies)
+                    Utils.batches 40 (Dict.values newMovies)
             in
                 { model
                     | lists = Dict.insert imdbUserId listOfIds model.lists

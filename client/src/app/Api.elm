@@ -17,7 +17,7 @@ apiUrl apiHost path =
 getWatchlistData : String -> String -> Cmd Msg
 getWatchlistData apiHost imdbUserId =
     Http.send (ReceivedWatchList imdbUserId) <|
-        Http.get (apiUrl apiHost ("/api/watchlist?userId=" ++ imdbUserId)) decodeWatchlist
+        Http.get (apiUrl apiHost ("/api/watchlist?userId=" ++ imdbUserId)) (Decode.at [ "list", "movies" ] (Decode.list decodeMovie))
 
 
 getBatchDetailedMovieData : String -> List Movie -> Cmd Msg
@@ -28,11 +28,6 @@ getBatchDetailedMovieData apiHost movies =
     in
         Http.send ReceivedMovies <|
             Http.post (apiUrl apiHost "/api/movies") (Http.jsonBody body) (Decode.field "movies" (Decode.list decodeMovie))
-
-
-decodeWatchlist : Decode.Decoder (List Movie)
-decodeWatchlist =
-    Decode.at [ "list", "movies" ] (Decode.list decodeMovie)
 
 
 decodeMovie : Decode.Decoder Movie

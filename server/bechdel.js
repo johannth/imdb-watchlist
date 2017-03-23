@@ -4,7 +4,7 @@ import PromiseThrottle from 'promise-throttle';
 import { handleErrors } from './utils';
 
 const promiseThrottle = new PromiseThrottle({
-  requestsPerSecond: 5,
+  requestsPerSecond: 10,
   promiseImplementation: Promise,
 });
 
