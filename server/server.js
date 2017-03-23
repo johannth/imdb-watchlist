@@ -174,19 +174,24 @@ const movieData = (
 
 const fetchWithCache = (url, options, expiryInSeconds) => {
   const cacheKey = `request:${url}:${JSON.stringify(options)}`;
-  return getJsonFromCache(cache)(cacheKey).then(cachedResponse => {
-    if (cachedResponse) {
-      console.log(`${url}: Serving from cache`);
-      return cachedResponse;
+  const promiseBuilder = () =>
+    fetch(url, options).then(response => {
+      return response.json();
+    });
+
+  return cachePromise(cacheKey, promiseBuilder, expiryInSeconds);
+};
+
+const cachePromise = (key, promiseBuilder, expiryInSeconds) => {
+  return getJsonFromCache(cache)(key).then(cachedValue => {
+    if (cachedValue) {
+      console.log(`${key}: Serving from cache`);
+      return cachedValue;
     }
 
-    console.log(`${url}: Fetching...`);
-    return fetch(url, options)
-      .then(response => response.json())
-      .then(json =>
-        saveJsonToCache(cache)(cacheKey, json, expiryInSeconds).then(
-          () => json
-        ));
+    console.log(`${key}: resolving...`);
+    return promiseBuilder().then(value =>
+      saveJsonToCache(cache)(key, value, expiryInSeconds).then(() => value));
   });
 };
 
@@ -200,16 +205,30 @@ const fetchMovieDetails = movie => {
       movie.releaseDate
     ).catch(error => {
       console.log(error);
-      return null;
+      return { viewingOptions: null };
+    }),
+    checkIfMovieIsOnLocalNetflix(movie.id, movie.title).catch(error => {
+      console.log(error);
+      return { netflixUrl: null };
     }),
   ])
-    .then(bechdelRating_justWatch => {
-      const bechdelRating = bechdelRating_justWatch[0];
-      const { viewingOptions } = bechdelRating_justWatch[1] || {};
+    .then(bechdelRating_justWatch_localNetflixUrl => {
+      const bechdelRating = bechdelRating_justWatch_localNetflixUrl[0];
+      const { viewingOptions } = bechdelRating_justWatch_localNetflixUrl[1];
+      const { netflixUrl } = bechdelRating_justWatch_localNetflixUrl[2];
+      const netflix = netflixUrl
+        ? offerData({
+            provider: 'netflix',
+            presentationType: 'hd',
+            monetizationType: 'flatrate',
+            url: netflixUrl,
+          })
+        : null;
+
       return movieData({
         ...movie,
         bechdelRating,
-        netflix: viewingOptions && viewingOptions.netflix,
+        netflix,
         amazon: viewingOptions && viewingOptions.amazon,
         itunes: viewingOptions && viewingOptions.itunes,
         hbo: viewingOptions && viewingOptions.hbo,
@@ -357,7 +376,7 @@ const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) => {
     );
 
     if (!possibleItem) {
-      return null;
+      return { viewingOptions: null };
     }
 
     const item = possibleItem;
@@ -371,7 +390,7 @@ const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) => {
         url: offer.urls.standard_web,
         monetizationType: offer.monetization_type,
         presentationType: offer.presentation_type,
-        retailPrice: offer.retail_price,
+        price: offer.retail_price,
       });
     });
 
@@ -393,111 +412,68 @@ const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) => {
   });
 };
 
-// const netflixCacheKey = imdbId => {
-//   return `netflix:${imdbId}`;
-// };
 //
-// //
-// // We get Netflix urls from JustWatch which work for the U.S. Netflix.
-// // Those won't necessary work on the Icelandic Netflix. The movie
-// // seems to have the same ID though so we try to see if a localized
-// // url returns 200.
-// app.get('/api/netflix', (req, res) => {
-//   const imdbId = req.query.imdbId;
-//   const title = req.query.title;
-//   const year = parseInt(req.query.year || '0');
-//   const locale = req.query.locale;
-//   var netflixUrl = req.query.netflixUrl &&
-//     req.query.netflixUrl.replace('http://', 'https://');
-//
-//   getJsonFromCache(cache)(netflixCacheKey(imdbId)).then(cachedResponse => {
-//     if (cachedResponse) {
-//       console.log(`/api/netflix ${imdbId}: Serving from cache`);
-//       res.json(cachedResponse);
-//       return;
-//     }
-//
-//     if (netflixUrl) {
-//       checkIfMovieIsAvailableOnNetflix(
-//         imdbId,
-//         netflixUrl,
-//         locale
-//       ).then(netflixUrl => {
-//         const payload = { data: { netflixUrl: netflixUrl } };
-//
-//         saveJsonToCache(cache)(
-//           netflixCacheKey(imdbId),
-//           payload,
-//           24 * 60 * 60
-//         ).then(() => {
-//           res.json(payload);
-//         });
-//       });
-//     } else {
-//       fetch(
-//         `http://denmark.flixlist.co/autocomplete/titles?q=${encodeURIComponent(title)}`
-//       )
-//         .then(response => {
-//           if (!response.ok) {
-//             return {};
-//           }
-//           return response.json();
-//         })
-//         .then(json => {
-//           const possibleNetflixId = json
-//             .filter(result => {
-//               return result.title === title; // This missing a check for year but it still much better than nothing.
-//             })
-//             .map(result => {
-//               return result.url.replace('/titles/', '');
-//             })[0];
-//
-//           if (possibleNetflixId) {
-//             checkIfMovieIsAvailableOnNetflix(
-//               imdbId,
-//               `https://www.netflix.com/title/${possibleNetflixId}`,
-//               locale
-//             ).then(netflixUrl => {
-//               const payload = { data: { netflixUrl: netflixUrl } };
-//
-//               saveJsonToCache(cache)(
-//                 netflixCacheKey(imdbId),
-//                 payload,
-//                 24 * 60 * 60
-//               ).then(() => {
-//                 res.json(payload);
-//               });
-//             });
-//           } else {
-//             res.json({ data: null });
-//           }
-//         });
-//     }
-//   });
-// });
-//
-// const checkIfMovieIsAvailableOnNetflix = (imdbId, netflixUrl, locale) => {
-//   const netflixUrlInLocale = netflixUrl.replace('/title/', `/${locale}/title/`);
-//
-//   const requestUrl = netflixUrl;
-//   return new Promise(function(resolve, reject) {
-//     request(
-//       { method: 'GET', followRedirect: false, url: requestUrl },
-//       (error, response, body) => {
-//         const locationHeader = response.headers['location'];
-//         console.log(
-//           `/api/netflix ${imdbId}: Netflix returned ${response.statusCode} on ${requestUrl} with location ${locationHeader}`
-//         );
-//
-//         resolve(
-//           response.statusCode == 200 || locationHeader === netflixUrlInLocale
-//             ? netflixUrlInLocale
-//             : null
-//         );
-//       }
-//     );
-//   });
-// };
+// We get Netflix urls from JustWatch which work for the U.S. Netflix.
+// Those won't necessary work on the Icelandic Netflix. The movie
+// seems to have the same ID though so we try to see if a localized
+// url returns 200.
+const checkIfMovieIsOnLocalNetflix = (imdbId, title) => {
+  return fetchWithCache(
+    `http://denmark.flixlist.co/autocomplete/titles?q=${encodeURIComponent(title)}`,
+    {},
+    24 * 60 * 60
+  ).then(json => {
+    if (!json.filter) {
+      return { netflixUrl: null };
+    }
+
+    const possibleNetflixId = json
+      .filter(result => {
+        return result.title === title; // This missing a check for year but it still much better than nothing.
+      })
+      .map(result => {
+        return result.url.replace('/titles/', '');
+      })[0];
+
+    if (!possibleNetflixId) {
+      return { netflixUrl: null };
+    }
+
+    return doubleCheckIfMovieIsOnLocaleNetflix(
+      imdbId,
+      `https://www.netflix.com/title/${possibleNetflixId}`,
+      'is'
+    );
+  });
+};
+
+const doubleCheckIfMovieIsOnLocaleNetflix = (imdbId, netflixUrl, locale) => {
+  const cacheKey = `netflix:${imdbId}:${locale}`;
+
+  const netflixUrlInLocale = netflixUrl.replace('/title/', `/${locale}/title/`);
+
+  const promiseBuilder = () => {
+    return new Promise(function(resolve, reject) {
+      request(
+        { method: 'GET', followRedirect: false, url: netflixUrl },
+        (error, response, body) => {
+          const locationHeader = response.headers['location'];
+          console.log(
+            `/api/netflix ${imdbId}: Netflix returned ${response.statusCode} on ${netflixUrl} with location ${locationHeader}`
+          );
+
+          resolve(
+            response.statusCode == 200 || locationHeader === netflixUrlInLocale
+              ? { netflixUrl: netflixUrlInLocale }
+              : { netflixUrl: null }
+          );
+        }
+      );
+    });
+  };
+
+  return cachePromise(cacheKey, promiseBuilder, 24 * 60 * 60);
+};
 
 // process.env.PORT lets the port be set by Heroku
 const port = process.env.PORT || 8080;
