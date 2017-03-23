@@ -27,7 +27,7 @@ type Msg
     | ImdbUserIdInput String
     | LookupWatchList String
     | ReceivedWatchList String (List Movie)
-    | ReceivedMovie Movie
+    | ReceivedMovies (List Movie)
     | Error String
     | ClearList String
     | SetTableState Table.State

@@ -1,4 +1,4 @@
-module Api exposing (getWatchlistData, getDetailedMovieData, subscriptions)
+module Api exposing (getWatchlistData, getBatchDetailedMovieData, subscriptions)
 
 import Json.Decode as Decode
 import Http
@@ -53,10 +53,10 @@ handlePayload encodedPayload =
                         Err error ->
                             Error error
 
-                "movie" ->
-                    case Decode.decodeValue (Decode.field "movie" decodeMovie) payload.body of
-                        Ok movie ->
-                            ReceivedMovie movie
+                "movies" ->
+                    case Decode.decodeValue (Decode.field "movies" (Decode.list decodeMovie)) payload.body of
+                        Ok movies ->
+                            ReceivedMovies movies
 
                         Err error ->
                             Error error
@@ -95,6 +95,11 @@ getWatchlistData apiHost imdbUserId =
 getDetailedMovieData : String -> Movie -> Cmd Msg
 getDetailedMovieData apiHost movie =
     websocketRequest apiHost "movie" [ ( "movie", encodeMovie movie ) ]
+
+
+getBatchDetailedMovieData : String -> List Movie -> Cmd Msg
+getBatchDetailedMovieData apiHost movies =
+    websocketRequest apiHost "movies" [ ( "movies", Encode.list (List.map encodeMovie movies) ) ]
 
 
 decodeWatchlist : Decode.Decoder (List Movie)

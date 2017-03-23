@@ -39,6 +39,16 @@ app.ws('/stream', (ws, req) => {
         });
         break;
       }
+      case 'movies': {
+        const { movies } = message.body;
+        Promise.all(
+          movies.map(movie => fetchMovieDetails(movie))
+        ).then(movies => {
+          ws.send(JSON.stringify({ type: message.type, body: { movies } }));
+        });
+        break;
+      }
+
       case 'movie': {
         const { movie } = message.body;
         fetchMovieDetails(movie).then(movie => {
@@ -63,6 +73,7 @@ const getJsonFromCache = cache =>
       }
     });
   };
+
 const saveJsonToCache = cache =>
   (key, value, expiryInSeconds) => {
     return cache.setexAsync(key, expiryInSeconds, JSON.stringify(value));
@@ -185,7 +196,7 @@ const fetchWithCache = (url, options, expiryInSeconds) => {
 const cachePromise = (key, promiseBuilder, expiryInSeconds) => {
   return getJsonFromCache(cache)(key).then(cachedValue => {
     if (cachedValue) {
-      console.log(`${key}: Serving from cache`);
+      console.log(`${key}: Serving from cache`, cachedValue);
       return cachedValue;
     }
 

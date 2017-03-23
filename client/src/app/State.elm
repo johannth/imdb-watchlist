@@ -76,16 +76,24 @@ update msg model =
 
                 newGenres =
                     List.foldl Set.union Set.empty (List.map .genres (Dict.values newMovies))
+
+                batchesOfMovies =
+                    Utils.batches 25 (Dict.values newMovies)
             in
                 { model
                     | lists = Dict.insert imdbUserId listOfIds model.lists
                     , movies = Dict.union newMovies model.movies
                     , genres = Set.union newGenres model.genres
                 }
-                    ! List.map (Api.getDetailedMovieData model.apiHost) (Dict.values newMovies)
+                    ! List.map (Api.getBatchDetailedMovieData model.apiHost) batchesOfMovies
 
-        ReceivedMovie movie ->
-            { model | movies = Dict.insert movie.id movie model.movies } ! []
+        ReceivedMovies movies ->
+            let
+                newMovies =
+                    List.map (Utils.lift2 .id identity) movies
+                        |> Dict.fromList
+            in
+                { model | movies = Dict.union newMovies model.movies } ! []
 
         Error error ->
             { model | error = Just error } ! []
