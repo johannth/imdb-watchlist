@@ -51,7 +51,7 @@ handlePayload encodedPayload =
                             ReceivedWatchList payload.userId payload.movies
 
                         Err error ->
-                            Void
+                            Error error
 
                 "movie" ->
                     case Decode.decodeValue (Decode.field "movie" decodeMovie) payload.body of
@@ -59,13 +59,13 @@ handlePayload encodedPayload =
                             ReceivedMovie movie
 
                         Err error ->
-                            Void
+                            Error error
 
                 _ ->
                     Void
 
         Err error ->
-            Void
+            Error error
 
 
 subscriptions : Model -> Sub Msg
@@ -98,7 +98,7 @@ encodedMovie movie =
         [ ( "id", Encode.string movie.id )
         , ( "title", Encode.string movie.title )
         , ( "imdbUrl", Encode.string movie.imdbUrl )
-        , ( "type", Encode.string (movieTypetoString movie.itemType) )
+        , ( "type", encodeMovieType movie.itemType )
         , ( "releaseDate"
           , case movie.releaseDate of
                 Just releaseDate ->
@@ -117,7 +117,9 @@ encodedMovie movie =
           )
         , ( "genres", Encode.list (List.map Encode.string (Set.toList movie.genres)) )
         , ( "ratings", Encode.null )
+          -- TODO
         , ( "viewingOptions", Encode.null )
+          -- TODO
         ]
 
 
@@ -142,7 +144,7 @@ decodeMovie =
         (Decode.maybe (Decode.field "runTime" Decode.int))
         (Decode.field "genres" (Decode.map Set.fromList (Decode.list Decode.string)))
         (Decode.field "ratings" decodeRatings)
-        (Decode.succeed (ViewingOptions Nothing Nothing Nothing Nothing))
+        (Decode.field "viewingOptions" decodeViewingOptions)
 
 
 decodeItemType : Decode.Decoder MovieType
@@ -150,7 +152,7 @@ decodeItemType =
     Decode.map
         (\value ->
             case value of
-                "featureFilm" ->
+                "file" ->
                     Film
 
                 "series" ->
@@ -160,6 +162,18 @@ decodeItemType =
                     Film
         )
         (Decode.at [ "type" ] Decode.string)
+
+
+encodeMovieType : MovieType -> Encode.Value
+encodeMovieType movieType =
+    Encode.string
+        (case movieType of
+            Film ->
+                "film"
+
+            Series ->
+                "series"
+        )
 
 
 decodeMovieReleaseDate : Decode.Decoder (Maybe Date)
@@ -184,100 +198,88 @@ decodeBechdel =
     )
 
 
+decodeViewingOptions : Decode.Decoder ViewingOptions
+decodeViewingOptions =
+    Decode.map4 ViewingOptions
+        (unwrapDecoder (Decode.maybe (Decode.field "netflix" decodeViewingOption)))
+        (unwrapDecoder (Decode.maybe (Decode.field "hbo" decodeViewingOption)))
+        (unwrapDecoder (Decode.maybe (Decode.field "itunes" decodeViewingOption)))
+        (unwrapDecoder (Decode.maybe (Decode.field "amazon" decodeViewingOption)))
 
--- -- JUSTWATCH
---
---
--- getJustWatchData : String -> String -> String -> MovieType -> Maybe Int -> Cmd Msg
--- getJustWatchData apiHost imdbId title itemType year =
---     let
---         yearPart =
---             Maybe.withDefault "" (Maybe.map (\year -> "&year=" ++ toString year) year)
---
---         typePart =
---             "&type="
---                 ++ (case itemType of
---                         Film ->
---                             "film"
---
---                         Series ->
---                             "series"
---                    )
---
---         query =
---             "imdbId=" ++ imdbId ++ "&title=" ++ title ++ yearPart ++ typePart
---     in
---         Http.send (LoadJustWatch imdbId) <|
---             Http.get (apiUrl apiHost ("/api/justwatch?" ++ query)) decodeJustWatchData
---
---
--- decodeJustWatchData : Decode.Decoder (Maybe JustWatchData)
--- decodeJustWatchData =
---     Decode.maybe
---         (Decode.map2 JustWatchData
---             (Decode.at [ "data", "offers" ] (Decode.map (List.filterMap identity) (Decode.list decodeOffer)))
---             (Decode.at [ "data", "scoring" ] (Decode.list decodeJustWatchScore))
---         )
---
---
--- decodeOffer : Decode.Decoder (Maybe JustWatchOffer)
--- decodeOffer =
---     Decode.map5 convertOfferJsonToType
---         (Decode.at [ "monetization_type" ] Decode.string)
---         (Decode.at [ "provider_id" ] Decode.int)
---         (Decode.at [ "urls", "standard_web" ] Decode.string)
---         (Decode.at [ "presentation_type" ] Decode.string)
---         (Decode.maybe (Decode.at [ "retail_price" ] Decode.float))
---
---
--- convertOfferJsonToType : String -> Int -> String -> String -> Maybe Float -> Maybe JustWatchOffer
--- convertOfferJsonToType monetizationType providerId url presentationType maybePrice =
---     case ( monetizationType, (convertProviderId providerId), (convertPresentationType presentationType), maybePrice ) of
---         ( "flatrate", Maybe.Just provider, Maybe.Just presentationType, _ ) ->
---             Maybe.Just (Flatrate provider url presentationType)
---
---         ( "buy", Maybe.Just provider, Maybe.Just presentationType, Maybe.Just price ) ->
---             Maybe.Just (Buy provider url presentationType price)
---
---         ( "rent", Maybe.Just provider, Maybe.Just presentationType, Maybe.Just price ) ->
---             Maybe.Just (Rent provider url presentationType price)
---
---         _ ->
---             Maybe.Nothing
---
---
--- convertProviderId : Int -> Maybe JustWatchProvider
--- convertProviderId providerId =
---     case providerId of
---         2 ->
---             Maybe.Just ITunes
---
---         8 ->
---             Maybe.Just Netflix
---
---         10 ->
---             Maybe.Just Amazon
---
---         27 ->
---             Maybe.Just HBO
---
---         _ ->
---             Maybe.Nothing
---
---
--- convertPresentationType : String -> Maybe JustWatchPresentationType
--- convertPresentationType presentationType =
---     case presentationType of
---         "hd" ->
---             Maybe.Just HD
---
---         "sd" ->
---             Maybe.Just SD
---
---         _ ->
---             Maybe.Nothing
---
---
+
+unwrapDecoder : Decode.Decoder (Maybe (Maybe a)) -> Decode.Decoder (Maybe a)
+unwrapDecoder decoder =
+    decoder
+        |> Decode.andThen
+            (\maybeValue ->
+                case maybeValue of
+                    Just value ->
+                        Decode.succeed value
+
+                    Nothing ->
+                        Decode.succeed Nothing
+            )
+
+
+decodeViewingOption : Decode.Decoder (Maybe ViewingOption)
+decodeViewingOption =
+    Decode.map5 convertViewingOptionJsonToType
+        (Decode.field "monetizationType" Decode.string)
+        (Decode.field "provider" Decode.string)
+        (Decode.field "url" Decode.string)
+        (Decode.field "presentationType" Decode.string)
+        (Decode.maybe (Decode.field "price" Decode.float))
+
+
+convertViewingOptionJsonToType : String -> String -> String -> String -> Maybe Float -> Maybe ViewingOption
+convertViewingOptionJsonToType monetizationType providerId url presentationType maybePrice =
+    case ( monetizationType, (convertProviderId providerId), (convertPresentationType presentationType), maybePrice ) of
+        ( "flatrate", Just provider, Just presentationType, _ ) ->
+            Just (Flatrate provider url presentationType)
+
+        ( "buy", Just provider, Just presentationType, Just price ) ->
+            Just (Buy provider url presentationType price)
+
+        ( "rent", Just provider, Just presentationType, Just price ) ->
+            Just (Rent provider url presentationType price)
+
+        _ ->
+            Nothing
+
+
+convertProviderId : String -> Maybe ViewingOptionProvider
+convertProviderId providerString =
+    case providerString of
+        "itunes" ->
+            Just ITunes
+
+        "netflix" ->
+            Just Netflix
+
+        "amazon" ->
+            Just Amazon
+
+        "hbo" ->
+            Just HBO
+
+        _ ->
+            Nothing
+
+
+convertPresentationType : String -> Maybe ViewingOptionPresentationType
+convertPresentationType presentationType =
+    case presentationType of
+        "hd" ->
+            Just HD
+
+        "sd" ->
+            Just SD
+
+        _ ->
+            Nothing
+
+
+
 -- decodeJustWatchScore : Decode.Decoder JustWatchScore
 -- decodeJustWatchScore =
 --     Decode.map2 JustWatchScore

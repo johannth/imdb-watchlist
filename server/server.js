@@ -111,12 +111,17 @@ const calculateMovieRunTime = imdbMovieData => {
   return runTimeInSeconds ? runTimeInSeconds * numberOfEpisodes / 60 : null;
 };
 
+const imdbMovieTypes = {
+  featureFilm: 'film',
+  series: 'series',
+};
+
 const convertImdbMovieToMovie = imdbMovieData => {
   return movieData({
     id: imdbMovieData.id,
     title: imdbMovieData.primary.title,
     imdbUrl: `http://www.imdb.com${imdbMovieData.primary.href}`,
-    type: imdbMovieData.type,
+    type: imdbMovieTypes[imdbMovieData.type],
     releaseDate: imdbMovieData.metadata.release,
     runTime: calculateMovieRunTime(imdbMovieData),
     genres: imdbMovieData.metadata.genres,
@@ -159,16 +164,16 @@ const movieData = (
       bechdel: bechdelRating,
     },
     viewingOptions: {
-      netflix,
-      hbo,
-      itunes,
-      amazon,
+      netflix: netflix || null,
+      hbo: hbo || null,
+      itunes: itunes || null,
+      amazon: amazon || null,
     },
   };
 };
 
 const fetchWithCache = (url, options, expiryInSeconds) => {
-  const cacheKey = `request:${url}`;
+  const cacheKey = `request:${url}:${JSON.stringify(options)}`;
   return getJsonFromCache(cache)(cacheKey).then(cachedResponse => {
     if (cachedResponse) {
       console.log(`${url}: Serving from cache`);
@@ -188,13 +193,31 @@ const fetchWithCache = (url, options, expiryInSeconds) => {
 const fetchMovieDetails = movie => {
   return Promise.all([
     fetchBechdel(movie.id).catch(error => null),
-  ]).then(bechdelRating_ => {
-    const bechdelRating = bechdelRating_[0];
-    return movieData({
-      ...movie,
-      bechdelRating,
+    fetchJustWatchData(
+      movie.id,
+      movie.title,
+      movie.type,
+      movie.releaseDate
+    ).catch(error => {
+      console.log(error);
+      return null;
+    }),
+  ])
+    .then(bechdelRating_justWatch => {
+      const bechdelRating = bechdelRating_justWatch[0];
+      const { viewingOptions } = bechdelRating_justWatch[1] || {};
+      return movieData({
+        ...movie,
+        bechdelRating,
+        netflix: viewingOptions && viewingOptions.netflix,
+        amazon: viewingOptions && viewingOptions.amazon,
+        itunes: viewingOptions && viewingOptions.itunes,
+        hbo: viewingOptions && viewingOptions.hbo,
+      });
+    })
+    .catch(error => {
+      console.error(error);
     });
-  });
 };
 
 const fetchBechdel = imdbId => {
@@ -222,103 +245,153 @@ const fetchBechdel = imdbId => {
       return { rating: parseInt(json.rating), dubious: json.dubious === '1' };
     });
 };
-//
-// const justwatchCacheKey = imdbId => {
-//   return `justwatch:${imdbId}`;
-// };
-//
-// const findBestPossibleJustwatchResult = (title, year, type, results) => {
-//   if (!results) {
-//     return null;
-//   }
-//
-//   return results.filter(result => {
-//     const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
-//     const titleAndYearMatch = titleMatch === 0 &&
-//       result.original_release_year === year;
-//     const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
-//       result.original_release_year === year;
-//     const titleMatchesForSeries = titleMatch === 0 && type === 'series';
-//     return titleAndYearMatch || fuzzyTitleAndYearMatch || titleMatchesForSeries;
-//   })[0];
-// };
-//
-// const justwatchType = itemType => {
-//   switch (itemType) {
-//     case 'film':
-//       return 'movie';
-//     case 'series':
-//       return 'show';
-//   }
-// };
 
-// const fetchJustWatchData = (imdbId, title, type, year) => {
-//   return getJsonFromCache(cache)(
-//     justwatchCacheKey(imdbId)
-//   ).then(cachedResponse => {
-//     if (cachedResponse) {
-//       console.log(`/api/justwatch ${imdbId}: Serving from cache`);
-//       res.json(cachedResponse);
-//       return;
-//     }
-//
-//     fetch('https://api.justwatch.com/titles/en_US/popular', {
-//       method: 'POST',
-//       body: JSON.stringify({
-//         content_types: [justwatchType(type)],
-//         query: title,
-//       }),
-//       headers: {
-//         Accept: 'application/json, text/plain, */*',
-//         'Content-Type': 'application/json',
-//       },
-//     })
-//       .then(handleErrors)
-//       .then(response => {
-//         return response.json();
-//       })
-//       .then(json => {
-//         const possibleItem = findBestPossibleJustwatchResult(
-//           title,
-//           year,
-//           type,
-//           json.items
-//         );
-//
-//         if (!possibleItem) {
-//           res.json({ data: null });
-//           return;
-//         }
-//
-//         const item = possibleItem;
-//
-//         const response = {
-//           data: {
-//             id: item.id,
-//             href: `https://www.justwatch.com${item.full_path}`,
-//             offers: item.offers,
-//             scoring: item.scoring,
-//           },
-//         };
-//
-//         saveJsonToCache(cache)(
-//           justwatchCacheKey(imdbId),
-//           response,
-//           24 * 60 * 60
-//         ).then(() => {
-//           res.json(response);
-//         });
-//       });
-//   });
-// };
-//
-// app.get('/api/justwatch', (req, res) => {
-//   const imdbId = req.query.imdbId;
-//   const title = req.query.title;
-//   const type = req.query.type;
-//   const year = parseInt(req.query.year || '0');
-// });
-//
+const findBestPossibleJustwatchResult = (title, year, type, results) => {
+  if (!results) {
+    return null;
+  }
+
+  return results.filter(result => {
+    const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
+    const titleAndYearMatch = titleMatch === 0 &&
+      result.original_release_year === year;
+    const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
+      result.original_release_year === year;
+    const titleMatchesForSeries = titleMatch === 0 && type === 'series';
+    return titleAndYearMatch || fuzzyTitleAndYearMatch || titleMatchesForSeries;
+  })[0];
+};
+
+const justwatchType = itemType => {
+  switch (itemType) {
+    case 'film':
+      return 'movie';
+    case 'series':
+      return 'show';
+  }
+};
+
+const justWatchProviders = {
+  2: 'itunes',
+  8: 'netflix',
+  10: 'amazon',
+  27: 'hbo',
+};
+
+const offerData = (
+  {
+    provider,
+    url,
+    monetizationType,
+    presentationType,
+    price,
+  }
+) => {
+  return {
+    provider,
+    url,
+    monetizationType,
+    presentationType,
+    price: price || null,
+  };
+};
+
+const extractBestViewingOption = (provider, viewingOptions) => {
+  const viewingOptionsByProvider = viewingOptions.filter(
+    viewingOption => viewingOption.provider === provider
+  );
+
+  viewingOptionsByProvider.sort((viewingOptionA, viewingOptionB) => {
+    const ordinalA = viewingOptionOrdinal(viewingOptionA);
+    const ordinalB = viewingOptionOrdinal(viewingOptionB);
+
+    for (var i = 0; i !== ordinalA.length; i++) {
+      const result = ordinalA[i] - ordinalB[i];
+      if (result !== 0) {
+        return result;
+      }
+    }
+    return 0;
+  });
+
+  return viewingOptionsByProvider[0] || null;
+};
+
+const viewingOptionOrdinal = viewingOption => {
+  const presentationTypeOrdinal = viewingOption.presentationType === 'hd'
+    ? 0
+    : 1;
+  switch (viewingOption.monetizationType) {
+    case 'flatrate':
+      return [0, presentationTypeOrdinal, 0];
+    case 'rent':
+      return [1, presentationTypeOrdinal, viewingOption.price];
+    case 'buy':
+      return [2, presentationTypeOrdinal, viewingOption.price];
+  }
+};
+
+const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) => {
+  const releaseDate = new Date(releaseDateTimestamp);
+  const year = releaseDate.getFullYear();
+  return fetchWithCache(
+    'https://api.justwatch.com/titles/en_US/popular',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        content_types: [justwatchType(type)],
+        query: title,
+      }),
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Content-Type': 'application/json',
+      },
+    },
+    24 * 60 * 60
+  ).then(json => {
+    const possibleItem = findBestPossibleJustwatchResult(
+      title,
+      year,
+      type,
+      json.items
+    );
+
+    if (!possibleItem) {
+      return null;
+    }
+
+    const item = possibleItem;
+
+    const offers = item.offers || [];
+
+    const viewingOptions = offers.map(offer => {
+      const provider = justWatchProviders[offer.provider_id];
+      return offerData({
+        provider,
+        url: offer.urls.standard_web,
+        monetizationType: offer.monetization_type,
+        presentationType: offer.presentation_type,
+        retailPrice: offer.retail_price,
+      });
+    });
+
+    const netflix = extractBestViewingOption('netflix', viewingOptions);
+    const amazon = extractBestViewingOption('amazon', viewingOptions);
+    const hbo = extractBestViewingOption('hbo', viewingOptions);
+    const itunes = extractBestViewingOption('itunes', viewingOptions);
+
+    const scoring = item.scoring;
+
+    return {
+      viewingOptions: {
+        netflix,
+        amazon,
+        hbo,
+        itunes,
+      },
+    };
+  });
+};
 
 // const netflixCacheKey = imdbId => {
 //   return `netflix:${imdbId}`;

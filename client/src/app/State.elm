@@ -87,6 +87,9 @@ update msg model =
         ReceivedMovie movie ->
             { model | movies = Dict.insert movie.id movie model.movies } ! []
 
+        Error error ->
+            { model | error = Just error } ! []
+
         SetTableState newState ->
             { model | tableState = newState } ! []
 
@@ -100,40 +103,6 @@ update msg model =
                 { model | selectedGenres = Set.insert genre model.selectedGenres }
             )
                 ! []
-
-
-extractBestOffer : JustWatchProvider -> List JustWatchOffer -> Maybe JustWatchOffer
-extractBestOffer provider offers =
-    List.filter (\offer -> (providerFromOffer offer) == provider) offers
-        |> List.sortWith offerOrder
-        |> List.head
-
-
-offerOrder : JustWatchOffer -> JustWatchOffer -> Order
-offerOrder offerA offerB =
-    compare (offerOrdinal offerA) (offerOrdinal offerB)
-
-
-offerOrdinal : JustWatchOffer -> ( Int, Int, Float )
-offerOrdinal offer =
-    let
-        presentationTypeOrdinal presentationType =
-            case presentationType of
-                SD ->
-                    1
-
-                HD ->
-                    0
-    in
-        case offer of
-            Flatrate _ _ presentationType ->
-                ( 0, presentationTypeOrdinal presentationType, 0 )
-
-            Rent _ _ presentationType price ->
-                ( 1, presentationTypeOrdinal presentationType, price )
-
-            Buy _ _ presentationType price ->
-                ( 2, presentationTypeOrdinal presentationType, price )
 
 
 extractScore : String -> List JustWatchScore -> Maybe Float

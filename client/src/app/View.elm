@@ -32,7 +32,7 @@ movieIsOfGenre movies selectedGenres movieId =
 
 
 rootView : Model -> Html Msg
-rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, tableState, buildInfo } =
+rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, tableState, buildInfo, error } =
     let
         list =
             Dict.values lists
@@ -65,6 +65,14 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, t
                                 Table.view config tableState expandedList
                     ]
                 ]
+            , div [ id "error" ]
+                [ case error of
+                    Just error ->
+                        text error
+
+                    Nothing ->
+                        text ""
+                ]
             , div [ id "footer" ]
                 [ buildInfoView buildInfo
                 ]
@@ -90,7 +98,7 @@ config =
         , toMsg = SetTableState
         , columns =
             [ movieTitleColumn
-            , Table.stringColumn "Type" (.itemType >> movieTypetoString)
+            , Table.stringColumn "Type" (.itemType >> movieTypeToString)
             , Table.stringColumn "Genres" (.genres >> Set.toList >> List.sort >> (String.join ", "))
             , releaseYearColumn
             , runTimeColumn
@@ -130,9 +138,9 @@ releaseYearColumn =
         maybeIntColumn "Release Year" extractYear
 
 
-cellForOffer : Maybe JustWatchOffer -> Table.HtmlDetails Msg
-cellForOffer offer =
-    case offer of
+cellForOffer : Maybe ViewingOption -> Table.HtmlDetails Msg
+cellForOffer viewingOption =
+    case viewingOption of
         Just (Flatrate _ url _) ->
             linkCell "Free" url
 
@@ -146,7 +154,7 @@ cellForOffer offer =
             Table.HtmlDetails [] []
 
 
-streamColumn : String -> (Movie -> Maybe JustWatchOffer) -> Table.Column Movie Msg
+streamColumn : String -> (Movie -> Maybe ViewingOption) -> Table.Column Movie Msg
 streamColumn name accessor =
     Table.veryCustomColumn
         { name = name
