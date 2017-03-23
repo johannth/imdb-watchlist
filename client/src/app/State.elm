@@ -157,13 +157,13 @@ normalizeRunTimeWithParameters optimalRunTime optimalRunTimeScore runTime =
         k / (runTime ^ 2 + k) * 100
 
 
-calculatePriority : Movie -> Float
-calculatePriority =
-    calculatePriorityWithWeights defaultPriorityWeights
+calculatePriority : Int -> Movie -> Float
+calculatePriority nrOfVotes =
+    calculatePriorityWithWeights nrOfVotes defaultPriorityWeights
 
 
-calculatePriorityWithWeights : PriorityWeights -> Movie -> Float
-calculatePriorityWithWeights weights movie =
+calculatePriorityWithWeights : Int -> PriorityWeights -> Movie -> Float
+calculatePriorityWithWeights nrOfVotes weights movie =
     let
         extractValueToFloat default maybeInt =
             Maybe.withDefault default (Maybe.map toFloat maybeInt)
@@ -176,8 +176,12 @@ calculatePriorityWithWeights weights movie =
 
         normalizedBechdel =
             extractValueToFloat 50 (Maybe.map normalizeBechdel movie.ratings.bechdel)
+
+        nrOfVotesWeight =
+            toFloat nrOfVotes
     in
-        streamabilityWeight
+        nrOfVotesWeight
+            * streamabilityWeight
             * (weights.metascore
                 * (extractValueToFloat 50 movie.ratings.metascore)
                 + weights.tomatoMeter

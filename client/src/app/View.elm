@@ -31,6 +31,21 @@ movieIsOfGenre movies selectedGenres movieId =
                 False
 
 
+countVotesForMovies : List (List String) -> Dict String Int
+countVotesForMovies lists =
+    List.foldl
+        (\movieId acc ->
+            case Dict.get movieId acc of
+                Just total ->
+                    Dict.insert movieId (total + 1) acc
+
+                Nothing ->
+                    Dict.insert movieId 1 acc
+        )
+        Dict.empty
+        (List.concatMap identity lists)
+
+
 rootView : Model -> Html Msg
 rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, tableState, buildInfo, error } =
     let
@@ -40,6 +55,12 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, t
                 |> List.foldl Set.union Set.empty
                 |> Set.filter (movieIsOfGenre movies selectedGenres)
                 |> Set.toList
+
+        movieVotes =
+            if Dict.size lists == 1 then
+                Nothing
+            else
+                Just (countVotesForMovies (Dict.values lists))
     in
         div [ id "content" ]
             [ h1 [ id "title" ] [ text "Watchlist" ]
@@ -70,7 +91,7 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, t
                                 expandedList =
                                     List.filterMap (\movieId -> Dict.get movieId movies) list
                             in
-                                Table.view config tableState expandedList
+                                Table.view (config movieVotes) tableState expandedList
                     ]
                 ]
             , div [ id "footer" ]
@@ -91,12 +112,19 @@ genreView selectedGenres genre =
         a [ classList [ ( "genre", True ), ( "selected", isSelected ) ], href "#", Html.Events.onClick (ToggleGenreFilter genre) ] [ text genre ]
 
 
-config : Table.Config Movie Msg
-config =
-    Table.config
-        { toId = .id
-        , toMsg = SetTableState
-        , columns =
+config : Maybe (Dict String Int) -> Table.Config Movie Msg
+config maybeMovieVotes =
+    let
+        countColumn =
+            (case maybeMovieVotes of
+                Just movieVotes ->
+                    [ Table.intColumn "Count" (\movie -> Maybe.withDefault 1 (Dict.get movie.id movieVotes)) ]
+
+                Nothing ->
+                    []
+            )
+
+        columns =
             [ movieTitleColumn
             , Table.stringColumn "Type" (.itemType >> movieTypeToString)
             , Table.stringColumn "Genres" (.genres >> Set.toList >> List.sort >> (String.join ", "))
@@ -110,9 +138,16 @@ config =
             , streamColumn "HBO" (.viewingOptions >> .hbo)
             , streamColumn "Amazon" (.viewingOptions >> .amazon)
             , streamColumn "iTunes" (.viewingOptions >> .itunes)
-            , priorityColumn
             ]
-        }
+                ++ countColumn
+                ++ [ priorityColumn (Maybe.withDefault Dict.empty maybeMovieVotes)
+                   ]
+    in
+        Table.config
+            { toId = .id
+            , toMsg = SetTableState
+            , columns = columns
+            }
 
 
 buildInfoView : BuildInfo -> Html Msg
@@ -294,13 +329,20 @@ cellWithTooltip value tooltip =
         ]
 
 
-priorityColumn : Table.Column Movie Msg
-priorityColumn =
-    Table.customColumn
-        { name = "Priority"
-        , viewData = State.calculatePriority >> round >> toString
-        , sorter = Table.decreasingOrIncreasingBy State.calculatePriority
-        }
+priorityColumn : Dict String Int -> Table.Column Movie Msg
+priorityColumn movieCounts =
+    let
+        nrOfListAppearances =
+            \movie -> Maybe.withDefault 1 (Dict.get movie.id movieCounts)
+
+        calculatePriority =
+            \movie -> (State.calculatePriority (nrOfListAppearances movie) movie)
+    in
+        Table.customColumn
+            { name = "Priority"
+            , viewData = calculatePriority >> round >> toString
+            , sorter = Table.decreasingOrIncreasingBy calculatePriority
+            }
 
 
 imdbUserIdView : String -> Html Msg
