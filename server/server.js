@@ -227,6 +227,8 @@ const fetchMovieDetails = movie => {
 
       return movieData({
         ...movie,
+        imdbRating: movie.ratings.imdb,
+        metascore: movie.ratings.metascore,
         bechdelRating,
         netflix,
         amazon: viewingOptions && viewingOptions.amazon,

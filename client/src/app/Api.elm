@@ -92,8 +92,32 @@ getWatchlistData apiHost imdbUserId =
     websocketRequest apiHost "watchlist" [ ( "userId", Encode.string imdbUserId ) ]
 
 
-encodedMovie : Movie -> Encode.Value
-encodedMovie movie =
+getDetailedMovieData : String -> Movie -> Cmd Msg
+getDetailedMovieData apiHost movie =
+    websocketRequest apiHost "movie" [ ( "movie", encodeMovie movie ) ]
+
+
+decodeWatchlist : Decode.Decoder (List Movie)
+decodeWatchlist =
+    Decode.at [ "list", "movies" ] (Decode.list decodeMovie)
+
+
+decodeMovie : Decode.Decoder Movie
+decodeMovie =
+    map9 Movie
+        (Decode.field "id" Decode.string)
+        (Decode.field "title" Decode.string)
+        (Decode.field "imdbUrl" Decode.string)
+        decodeItemType
+        decodeMovieReleaseDate
+        (Decode.maybe (Decode.field "runTime" Decode.int))
+        (Decode.field "genres" (Decode.map Set.fromList (Decode.list Decode.string)))
+        (Decode.field "ratings" decodeRatings)
+        (Decode.field "viewingOptions" decodeViewingOptions)
+
+
+encodeMovie : Movie -> Encode.Value
+encodeMovie movie =
     Encode.object
         [ ( "id", Encode.string movie.id )
         , ( "title", Encode.string movie.title )
@@ -116,35 +140,23 @@ encodedMovie movie =
                     Encode.null
           )
         , ( "genres", Encode.list (List.map Encode.string (Set.toList movie.genres)) )
-        , ( "ratings", Encode.null )
-          -- TODO
+        , ( "ratings", encodeRatings movie.ratings )
         , ( "viewingOptions", Encode.null )
           -- TODO
         ]
 
 
-getDetailedMovieData : String -> Movie -> Cmd Msg
-getDetailedMovieData apiHost movie =
-    websocketRequest apiHost "movie" [ ( "movie", encodedMovie movie ) ]
-
-
-decodeWatchlist : Decode.Decoder (List Movie)
-decodeWatchlist =
-    Decode.at [ "list", "movies" ] (Decode.list decodeMovie)
-
-
-decodeMovie : Decode.Decoder Movie
-decodeMovie =
-    map9 Movie
-        (Decode.field "id" Decode.string)
-        (Decode.field "title" Decode.string)
-        (Decode.field "imdbUrl" Decode.string)
-        decodeItemType
-        decodeMovieReleaseDate
-        (Decode.maybe (Decode.field "runTime" Decode.int))
-        (Decode.field "genres" (Decode.map Set.fromList (Decode.list Decode.string)))
-        (Decode.field "ratings" decodeRatings)
-        (Decode.field "viewingOptions" decodeViewingOptions)
+encodeRatings : Ratings -> Encode.Value
+encodeRatings ratings =
+    let
+        encodeMaybeInt =
+            Maybe.map Encode.int >> Maybe.withDefault Encode.null
+    in
+        Encode.object
+            [ ( "imdb", encodeMaybeInt ratings.imdb )
+            , ( "metascore", encodeMaybeInt ratings.metascore )
+            , ( "rottenTomatoesMeter", encodeMaybeInt ratings.rottenTomatoesMeter )
+            ]
 
 
 decodeItemType : Decode.Decoder MovieType
@@ -186,7 +198,7 @@ decodeRatings =
     Decode.map4 Ratings
         (Decode.maybe (Decode.field "metascore" Decode.int))
         (Decode.maybe (Decode.field "rottenTomatoesMeter" Decode.int))
-        (Decode.maybe (Decode.field "imdbRating" Decode.int))
+        (Decode.maybe (Decode.field "imdb" Decode.int))
         (Decode.maybe (Decode.field "bechdel" decodeBechdel))
 
 
@@ -196,6 +208,14 @@ decodeBechdel =
         (Decode.field "rating" Decode.int)
         (Decode.field "dubious" Decode.bool)
     )
+
+
+encodeBechdel : BechdelRating -> Encode.Value
+encodeBechdel bechdelRating =
+    Encode.object
+        [ ( "rating", Encode.int bechdelRating.rating )
+        , ( "dubious", Encode.bool bechdelRating.dubious )
+        ]
 
 
 decodeViewingOptions : Decode.Decoder ViewingOptions
@@ -288,22 +308,3 @@ convertPresentationType presentationType =
 --
 --
 --
--- -- NETFLIX
---
---
--- getConfirmNetflixData : String -> String -> String -> Maybe Int -> Maybe String -> Cmd Msg
--- getConfirmNetflixData apiHost imdbId title year netflixUrl =
---     let
---         yearPart =
---             Maybe.withDefault "" (Maybe.map (\year -> "&year=" ++ (toString year)) year)
---
---         netflixUrlPart =
---             Maybe.withDefault "" (Maybe.map (\netflixUrl -> "&netflixUrl=" ++ netflixUrl) netflixUrl)
---     in
---         Http.send (LoadConfirmNetflix imdbId) <|
---             Http.get (apiUrl apiHost ("/api/netflix?locale=is&imdbId=" ++ imdbId ++ "&title=" ++ title ++ yearPart ++ netflixUrlPart)) decodeConfirmNetflixData
---
---
--- decodeConfirmNetflixData : Decode.Decoder (Maybe String)
--- decodeConfirmNetflixData =
---     Decode.maybe (Decode.at [ "data", "netflixUrl" ] Decode.string)
