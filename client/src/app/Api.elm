@@ -1,4 +1,4 @@
-module Api exposing (getWatchlistData, getBatchDetailedMovieData, subscriptions)
+module Api exposing (getWatchlistData, getBatchDetailedMovieData)
 
 import Json.Decode as Decode
 import Http
@@ -6,100 +6,28 @@ import Types exposing (..)
 import Date exposing (Date)
 import Utils exposing (map9)
 import Set
-import WebSocket
 import Json.Encode as Encode
 
 
-type alias ApiPayload =
-    { payloadType : String
-    , body : Decode.Value
-    }
-
-
-type alias WatchlistPayload =
-    { userId : String
-    , movies : List Movie
-    }
-
-
-decodePayload : String -> Result String ApiPayload
-decodePayload encodedPayload =
-    let
-        basePayloadDecoder =
-            Decode.map2 ApiPayload
-                (Decode.field "type" Decode.string)
-                (Decode.field "body" Decode.value)
-    in
-        Decode.decodeString basePayloadDecoder encodedPayload
-
-
-decodeWatchlistPayload : Decode.Decoder WatchlistPayload
-decodeWatchlistPayload =
-    Decode.map2 WatchlistPayload
-        (Decode.field "userId" Decode.string)
-        decodeWatchlist
-
-
-handlePayload : String -> Msg
-handlePayload encodedPayload =
-    case decodePayload encodedPayload of
-        Ok payload ->
-            case payload.payloadType of
-                "watchlist" ->
-                    case Decode.decodeValue decodeWatchlistPayload payload.body of
-                        Ok payload ->
-                            ReceivedWatchList payload.userId payload.movies
-
-                        Err error ->
-                            Error error
-
-                "movies" ->
-                    case Decode.decodeValue (Decode.field "movies" (Decode.list decodeMovie)) payload.body of
-                        Ok movies ->
-                            ReceivedMovies movies
-
-                        Err error ->
-                            Error error
-
-                _ ->
-                    Void
-
-        Err error ->
-            Error error
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    WebSocket.listen (websocketsUrl model.apiHost) handlePayload
-
-
-websocketsUrl : String -> String
-websocketsUrl apiHost =
-    "ws://" ++ apiHost ++ "/stream"
-
-
-websocketRequest : String -> String -> List ( String, Encode.Value ) -> Cmd Msg
-websocketRequest apiHost messageType messageBody =
-    let
-        encodedMessageBody =
-            Encode.object [ ( "type", Encode.string messageType ), ( "body", Encode.object messageBody ) ]
-    in
-        WebSocket.send (websocketsUrl apiHost) (Encode.encode 0 encodedMessageBody)
+apiUrl : String -> String -> String
+apiUrl apiHost path =
+    "http://" ++ apiHost ++ path
 
 
 getWatchlistData : String -> String -> Cmd Msg
 getWatchlistData apiHost imdbUserId =
-    websocketRequest apiHost "watchlist" [ ( "userId", Encode.string imdbUserId ) ]
-
-
-getDetailedMovieData : String -> Movie -> Cmd Msg
-getDetailedMovieData apiHost movie =
-    websocketRequest apiHost "movie" [ ( "movie", encodeMovie movie ) ]
+    Http.send (ReceivedWatchList imdbUserId) <|
+        Http.get (apiUrl apiHost ("/api/watchlist?userId=" ++ imdbUserId)) decodeWatchlist
 
 
 getBatchDetailedMovieData : String -> List Movie -> Cmd Msg
 getBatchDetailedMovieData apiHost movies =
-    websocketRequest apiHost "movies" [ ( "movies", Encode.list (List.map encodeMovie movies) ) ]
+    let
+        body =
+            (Encode.object [ ( "movies", Encode.list (List.map encodeMovie movies) ) ])
+    in
+        Http.send ReceivedMovies <|
+            Http.post (apiUrl apiHost "/api/movies") (Http.jsonBody body) (Decode.field "movies" (Decode.list decodeMovie))
 
 
 decodeWatchlist : Decode.Decoder (List Movie)
@@ -302,14 +230,3 @@ convertPresentationType presentationType =
 
         _ ->
             Nothing
-
-
-
--- decodeJustWatchScore : Decode.Decoder JustWatchScore
--- decodeJustWatchScore =
---     Decode.map2 JustWatchScore
---         (Decode.field "provider_type" Decode.string)
---         (Decode.field "value" Decode.float)
---
---
---

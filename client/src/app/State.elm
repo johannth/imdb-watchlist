@@ -6,7 +6,6 @@ import Types exposing (..)
 import Utils
 import Navigation
 import UrlParser exposing ((<?>))
-import Date
 import Set
 
 
@@ -65,7 +64,10 @@ update msg model =
             in
                 newModel ! [ Navigation.modifyUrl (updatedUrl newModel) ]
 
-        ReceivedWatchList imdbUserId movies ->
+        ReceivedWatchList imdbUserId (Err error) ->
+            model ! []
+
+        ReceivedWatchList imdbUserId (Ok movies) ->
             let
                 listOfIds =
                     List.map .id movies
@@ -87,7 +89,10 @@ update msg model =
                 }
                     ! List.map (Api.getBatchDetailedMovieData model.apiHost) batchesOfMovies
 
-        ReceivedMovies movies ->
+        ReceivedMovies (Err error) ->
+            model ! []
+
+        ReceivedMovies (Ok movies) ->
             let
                 newMovies =
                     List.map (Utils.lift2 .id identity) movies
@@ -111,13 +116,6 @@ update msg model =
                 { model | selectedGenres = Set.insert genre model.selectedGenres }
             )
                 ! []
-
-
-extractScore : String -> List JustWatchScore -> Maybe Float
-extractScore provider scores =
-    List.filter (\score -> score.providerType == provider) scores
-        |> List.head
-        |> Maybe.map .value
 
 
 calculateStreamabilityWeight : Movie -> Float

@@ -26,8 +26,8 @@ type Msg
     = Void
     | ImdbUserIdInput String
     | LookupWatchList String
-    | ReceivedWatchList String (List Movie)
-    | ReceivedMovies (List Movie)
+    | ReceivedWatchList String (Result Http.Error (List Movie))
+    | ReceivedMovies (Result Http.Error (List Movie))
     | Error String
     | ClearList String
     | SetTableState Table.State
@@ -69,6 +69,30 @@ type alias ViewingOptions =
     , hbo : Maybe ViewingOption
     , itunes : Maybe ViewingOption
     , amazon : Maybe ViewingOption
+    }
+
+
+type ViewingOptionPresentationType
+    = SD
+    | HD
+
+
+type ViewingOptionProvider
+    = Amazon
+    | ITunes
+    | Netflix
+    | HBO
+
+
+type ViewingOption
+    = Rent ViewingOptionProvider String ViewingOptionPresentationType Float
+    | Buy ViewingOptionProvider String ViewingOptionPresentationType Float
+    | Flatrate ViewingOptionProvider String ViewingOptionPresentationType
+
+
+type alias BechdelRating =
+    { rating : Int
+    , dubious : Bool
     }
 
 
@@ -118,34 +142,4 @@ type alias BuildInfo =
     { version : String
     , time : String
     , tier : String
-    }
-
-
-type ViewingOptionPresentationType
-    = SD
-    | HD
-
-
-type ViewingOptionProvider
-    = Amazon
-    | ITunes
-    | Netflix
-    | HBO
-
-
-type ViewingOption
-    = Rent ViewingOptionProvider String ViewingOptionPresentationType Float
-    | Buy ViewingOptionProvider String ViewingOptionPresentationType Float
-    | Flatrate ViewingOptionProvider String ViewingOptionPresentationType
-
-
-type alias JustWatchScore =
-    { providerType : String
-    , value : Float
-    }
-
-
-type alias BechdelRating =
-    { rating : Int
-    , dubious : Bool
     }
