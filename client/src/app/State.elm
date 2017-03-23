@@ -40,9 +40,6 @@ updatedUrl model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Void ->
-            model ! []
-
         ImdbUserIdInput partialImdbUserId ->
             { model | imdbUserIdInputCurrentValue = partialImdbUserId } ! []
 

@@ -23,8 +23,7 @@ type alias Model =
 
 
 type Msg
-    = Void
-    | ImdbUserIdInput String
+    = ImdbUserIdInput String
     | LookupWatchList String
     | ReceivedWatchList String (Result Http.Error (List Movie))
     | ReceivedMovies (Result Http.Error (List Movie))
