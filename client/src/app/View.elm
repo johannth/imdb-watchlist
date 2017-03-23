@@ -44,7 +44,15 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, t
         div [ id "content" ]
             [ h1 [ id "title" ] [ text "Watchlist" ]
             , div [ id "body" ]
-                [ imdbUserIdTextInput imdbUserIdInputCurrentValue
+                [ div [ id "error" ]
+                    [ case error of
+                        Just error ->
+                            text error
+
+                        Nothing ->
+                            text ""
+                    ]
+                , imdbUserIdTextInput imdbUserIdInputCurrentValue
                 , div [ id "imdb-users" ] (Dict.keys lists |> List.map imdbUserIdView)
                 , div [ id "genres" ] (Set.toList genres |> List.sort |> List.map (genreView selectedGenres))
                 , div [ id "list" ]
@@ -64,14 +72,6 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, t
                             in
                                 Table.view config tableState expandedList
                     ]
-                ]
-            , div [ id "error" ]
-                [ case error of
-                    Just error ->
-                        text error
-
-                    Nothing ->
-                        text ""
                 ]
             , div [ id "footer" ]
                 [ buildInfoView buildInfo
