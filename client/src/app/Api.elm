@@ -1,4 +1,4 @@
-module Api exposing (getWatchlistData, getBechdelData, getJustWatchData, getConfirmNetflixData)
+module Api exposing (getWatchlistData, getBatchDetailedMovieData)
 
 import Json.Decode as Decode
 import Http
@@ -6,40 +6,85 @@ import Types exposing (..)
 import Date exposing (Date)
 import Utils exposing (map9)
 import Set
+import Json.Encode as Encode
 
 
 apiUrl : String -> String -> String
 apiUrl apiHost path =
-    apiHost ++ path
+    "http://" ++ apiHost ++ path
 
 
 getWatchlistData : String -> String -> Cmd Msg
 getWatchlistData apiHost imdbUserId =
-    Http.send (LoadWatchList imdbUserId) <|
-        Http.get (apiUrl apiHost ("/api/watchlist?userId=" ++ imdbUserId)) decodeWatchlist
+    Http.send (ReceivedWatchList imdbUserId) <|
+        Http.get (apiUrl apiHost ("/api/watchlist?userId=" ++ imdbUserId)) (Decode.at [ "list", "movies" ] (Decode.list decodeMovie))
 
 
-decodeWatchlist : Decode.Decoder (List WatchListMovie)
-decodeWatchlist =
-    Decode.at [ "list", "movies" ] (Decode.list decodeWatchlistRowIntoMovie)
-
-
-decodeWatchlistRowIntoMovie : Decode.Decoder WatchListMovie
-decodeWatchlistRowIntoMovie =
+getBatchDetailedMovieData : String -> List Movie -> Cmd Msg
+getBatchDetailedMovieData apiHost movies =
     let
-        normalizeImdbRating rating =
-            round (rating * 10)
+        body =
+            (Encode.object [ ( "movies", Encode.list (List.map encodeMovie movies) ) ])
     in
-        map9 WatchListMovie
-            (Decode.at [ "id" ] Decode.string)
-            (Decode.at [ "primary", "title" ] Decode.string)
-            decodeImdbUrl
-            decodeItemType
-            decodeMovieReleaseDate
-            decodeMovieRunTime
-            (Decode.at [ "metadata", "genres" ] (Decode.map Set.fromList (Decode.list Decode.string)))
-            (Decode.maybe (Decode.at [ "ratings", "metascore" ] Decode.int))
-            (Decode.maybe (Decode.map normalizeImdbRating (Decode.at [ "ratings", "rating" ] Decode.float)))
+        Http.send ReceivedMovies <|
+            Http.post (apiUrl apiHost "/api/movies") (Http.jsonBody body) (Decode.field "movies" (Decode.list decodeMovie))
+
+
+decodeMovie : Decode.Decoder Movie
+decodeMovie =
+    map9 Movie
+        (Decode.field "id" Decode.string)
+        (Decode.field "title" Decode.string)
+        (Decode.field "imdbUrl" Decode.string)
+        decodeItemType
+        decodeMovieReleaseDate
+        (Decode.maybe (Decode.field "runTime" Decode.int))
+        (Decode.field "genres" (Decode.map Set.fromList (Decode.list Decode.string)))
+        (Decode.field "ratings" decodeRatings)
+        (Decode.field "viewingOptions" decodeViewingOptions)
+
+
+encodeMovie : Movie -> Encode.Value
+encodeMovie movie =
+    Encode.object
+        [ ( "id", Encode.string movie.id )
+        , ( "title", Encode.string movie.title )
+        , ( "imdbUrl", Encode.string movie.imdbUrl )
+        , ( "type", encodeMovieType movie.itemType )
+        , ( "releaseDate"
+          , case movie.releaseDate of
+                Just releaseDate ->
+                    Encode.float (Date.toTime releaseDate)
+
+                Nothing ->
+                    Encode.null
+          )
+        , ( "runTime"
+          , case movie.runTime of
+                Just runTime ->
+                    Encode.int runTime
+
+                Nothing ->
+                    Encode.null
+          )
+        , ( "genres", Encode.list (List.map Encode.string (Set.toList movie.genres)) )
+        , ( "ratings", encodeRatings movie.ratings )
+        , ( "viewingOptions", Encode.null )
+          -- TODO
+        ]
+
+
+encodeRatings : Ratings -> Encode.Value
+encodeRatings ratings =
+    let
+        encodeMaybeInt =
+            Maybe.map Encode.int >> Maybe.withDefault Encode.null
+    in
+        Encode.object
+            [ ( "imdb", encodeMaybeInt ratings.imdb )
+            , ( "metascore", encodeMaybeInt ratings.metascore )
+            , ( "rottenTomatoesMeter", encodeMaybeInt ratings.rottenTomatoesMeter )
+            ]
 
 
 decodeItemType : Decode.Decoder MovieType
@@ -47,7 +92,7 @@ decodeItemType =
     Decode.map
         (\value ->
             case value of
-                "featureFilm" ->
+                "file" ->
                     Film
 
                 "series" ->
@@ -59,197 +104,124 @@ decodeItemType =
         (Decode.at [ "type" ] Decode.string)
 
 
-decodeImdbUrl : Decode.Decoder String
-decodeImdbUrl =
-    Decode.map (\path -> "http://www.imdb.com" ++ path)
-        (Decode.at [ "primary", "href" ] Decode.string)
+encodeMovieType : MovieType -> Encode.Value
+encodeMovieType movieType =
+    Encode.string
+        (case movieType of
+            Film ->
+                "film"
 
-
-
--- metadata genre
+            Series ->
+                "series"
+        )
 
 
 decodeMovieReleaseDate : Decode.Decoder (Maybe Date)
 decodeMovieReleaseDate =
-    Decode.maybe (Decode.map Date.fromTime (Decode.at [ "metadata", "release" ] Decode.float))
+    Decode.maybe (Decode.map Date.fromTime (Decode.field "releaseDate" Decode.float))
 
 
-decodeMovieRunTime : Decode.Decoder (Maybe Int)
-decodeMovieRunTime =
-    Decode.map2 calculateMovieRunTime
-        (Decode.maybe (Decode.at [ "metadata", "runtime" ] Decode.int))
-        (Decode.maybe (Decode.at [ "metadata", "numberOfEpisodes" ] Decode.int))
+decodeRatings : Decode.Decoder Ratings
+decodeRatings =
+    Decode.map4 Ratings
+        (Decode.maybe (Decode.field "metascore" Decode.int))
+        (Decode.maybe (Decode.field "rottenTomatoesMeter" Decode.int))
+        (Decode.maybe (Decode.field "imdb" Decode.int))
+        (Decode.maybe (Decode.field "bechdel" decodeBechdel))
 
 
-calculateMovieRunTime : Maybe Int -> Maybe Int -> Maybe Int
-calculateMovieRunTime maybeRunTime maybeNumberOfEpisodes =
-    let
-        numberOfEpisodes =
-            Maybe.withDefault 1 maybeNumberOfEpisodes
-    in
-        Maybe.map (\runTime -> (runTime * numberOfEpisodes) // 60) maybeRunTime
-
-
-
--- BECHDEL
-
-
-getBechdelData : String -> String -> Cmd Msg
-getBechdelData apiHost imdbId =
-    Http.send (LoadBechdel imdbId) <|
-        Http.get (apiUrl apiHost ("/api/bechdel?imdbId=" ++ imdbId)) decodeBechdel
-
-
-decodeBechdel : Decode.Decoder (Maybe BechdelRating)
+decodeBechdel : Decode.Decoder BechdelRating
 decodeBechdel =
-    Decode.maybe
-        (Decode.map2 BechdelRating
-            (Decode.at [ "data", "rating" ] (Decode.string |> Decode.andThen decodeIntFromString))
-            (Decode.at [ "data", "dubious" ] (Decode.string |> Decode.andThen decodeBoolFromInt))
-        )
+    (Decode.map2 BechdelRating
+        (Decode.field "rating" Decode.int)
+        (Decode.field "dubious" Decode.bool)
+    )
 
 
-decodeIntFromString : String -> Decode.Decoder Int
-decodeIntFromString value =
-    case String.toInt value of
-        Ok valueAsInt ->
-            Decode.succeed valueAsInt
-
-        Err message ->
-            Decode.fail message
+encodeBechdel : BechdelRating -> Encode.Value
+encodeBechdel bechdelRating =
+    Encode.object
+        [ ( "rating", Encode.int bechdelRating.rating )
+        , ( "dubious", Encode.bool bechdelRating.dubious )
+        ]
 
 
-decodeBoolFromInt : String -> Decode.Decoder Bool
-decodeBoolFromInt value =
-    case value of
-        "0" ->
-            Decode.succeed False
-
-        "1" ->
-            Decode.succeed True
-
-        _ ->
-            Decode.fail ("Unable to decode Bool from value: " ++ (toString value))
+decodeViewingOptions : Decode.Decoder ViewingOptions
+decodeViewingOptions =
+    Decode.map4 ViewingOptions
+        (unwrapDecoder (Decode.maybe (Decode.field "netflix" decodeViewingOption)))
+        (unwrapDecoder (Decode.maybe (Decode.field "hbo" decodeViewingOption)))
+        (unwrapDecoder (Decode.maybe (Decode.field "itunes" decodeViewingOption)))
+        (unwrapDecoder (Decode.maybe (Decode.field "amazon" decodeViewingOption)))
 
 
+unwrapDecoder : Decode.Decoder (Maybe (Maybe a)) -> Decode.Decoder (Maybe a)
+unwrapDecoder decoder =
+    decoder
+        |> Decode.andThen
+            (\maybeValue ->
+                case maybeValue of
+                    Just value ->
+                        Decode.succeed value
 
--- JUSTWATCH
-
-
-getJustWatchData : String -> String -> String -> MovieType -> Maybe Int -> Cmd Msg
-getJustWatchData apiHost imdbId title itemType year =
-    let
-        yearPart =
-            Maybe.withDefault "" (Maybe.map (\year -> "&year=" ++ toString year) year)
-
-        typePart =
-            "&type="
-                ++ (case itemType of
-                        Film ->
-                            "film"
-
-                        Series ->
-                            "series"
-                   )
-
-        query =
-            "imdbId=" ++ imdbId ++ "&title=" ++ title ++ yearPart ++ typePart
-    in
-        Http.send (LoadJustWatch imdbId) <|
-            Http.get (apiUrl apiHost ("/api/justwatch?" ++ query)) decodeJustWatchData
+                    Nothing ->
+                        Decode.succeed Nothing
+            )
 
 
-decodeJustWatchData : Decode.Decoder (Maybe JustWatchData)
-decodeJustWatchData =
-    Decode.maybe
-        (Decode.map2 JustWatchData
-            (Decode.at [ "data", "offers" ] (Decode.map (List.filterMap identity) (Decode.list decodeOffer)))
-            (Decode.at [ "data", "scoring" ] (Decode.list decodeJustWatchScore))
-        )
+decodeViewingOption : Decode.Decoder (Maybe ViewingOption)
+decodeViewingOption =
+    Decode.map5 convertViewingOptionJsonToType
+        (Decode.field "monetizationType" Decode.string)
+        (Decode.field "provider" Decode.string)
+        (Decode.field "url" Decode.string)
+        (Decode.field "presentationType" Decode.string)
+        (Decode.maybe (Decode.field "price" Decode.float))
 
 
-decodeOffer : Decode.Decoder (Maybe JustWatchOffer)
-decodeOffer =
-    Decode.map5 convertOfferJsonToType
-        (Decode.at [ "monetization_type" ] Decode.string)
-        (Decode.at [ "provider_id" ] Decode.int)
-        (Decode.at [ "urls", "standard_web" ] Decode.string)
-        (Decode.at [ "presentation_type" ] Decode.string)
-        (Decode.maybe (Decode.at [ "retail_price" ] Decode.float))
-
-
-convertOfferJsonToType : String -> Int -> String -> String -> Maybe Float -> Maybe JustWatchOffer
-convertOfferJsonToType monetizationType providerId url presentationType maybePrice =
+convertViewingOptionJsonToType : String -> String -> String -> String -> Maybe Float -> Maybe ViewingOption
+convertViewingOptionJsonToType monetizationType providerId url presentationType maybePrice =
     case ( monetizationType, (convertProviderId providerId), (convertPresentationType presentationType), maybePrice ) of
-        ( "flatrate", Maybe.Just provider, Maybe.Just presentationType, _ ) ->
-            Maybe.Just (Flatrate provider url presentationType)
+        ( "flatrate", Just provider, Just presentationType, _ ) ->
+            Just (Flatrate provider url presentationType)
 
-        ( "buy", Maybe.Just provider, Maybe.Just presentationType, Maybe.Just price ) ->
-            Maybe.Just (Buy provider url presentationType price)
+        ( "buy", Just provider, Just presentationType, Just price ) ->
+            Just (Buy provider url presentationType price)
 
-        ( "rent", Maybe.Just provider, Maybe.Just presentationType, Maybe.Just price ) ->
-            Maybe.Just (Rent provider url presentationType price)
-
-        _ ->
-            Maybe.Nothing
-
-
-convertProviderId : Int -> Maybe JustWatchProvider
-convertProviderId providerId =
-    case providerId of
-        2 ->
-            Maybe.Just ITunes
-
-        8 ->
-            Maybe.Just Netflix
-
-        10 ->
-            Maybe.Just Amazon
-
-        27 ->
-            Maybe.Just HBO
+        ( "rent", Just provider, Just presentationType, Just price ) ->
+            Just (Rent provider url presentationType price)
 
         _ ->
-            Maybe.Nothing
+            Nothing
 
 
-convertPresentationType : String -> Maybe JustWatchPresentationType
+convertProviderId : String -> Maybe ViewingOptionProvider
+convertProviderId providerString =
+    case providerString of
+        "itunes" ->
+            Just ITunes
+
+        "netflix" ->
+            Just Netflix
+
+        "amazon" ->
+            Just Amazon
+
+        "hbo" ->
+            Just HBO
+
+        _ ->
+            Nothing
+
+
+convertPresentationType : String -> Maybe ViewingOptionPresentationType
 convertPresentationType presentationType =
     case presentationType of
         "hd" ->
-            Maybe.Just HD
+            Just HD
 
         "sd" ->
-            Maybe.Just SD
+            Just SD
 
         _ ->
-            Maybe.Nothing
-
-
-decodeJustWatchScore : Decode.Decoder JustWatchScore
-decodeJustWatchScore =
-    Decode.map2 JustWatchScore
-        (Decode.field "provider_type" Decode.string)
-        (Decode.field "value" Decode.float)
-
-
-
--- NETFLIX
-
-
-getConfirmNetflixData : String -> String -> String -> Maybe Int -> Maybe String -> Cmd Msg
-getConfirmNetflixData apiHost imdbId title year netflixUrl =
-    let
-        yearPart =
-            Maybe.withDefault "" (Maybe.map (\year -> "&year=" ++ (toString year)) year)
-
-        netflixUrlPart =
-            Maybe.withDefault "" (Maybe.map (\netflixUrl -> "&netflixUrl=" ++ netflixUrl) netflixUrl)
-    in
-        Http.send (LoadConfirmNetflix imdbId) <|
-            Http.get (apiUrl apiHost ("/api/netflix?locale=is&imdbId=" ++ imdbId ++ "&title=" ++ title ++ yearPart ++ netflixUrlPart)) decodeConfirmNetflixData
-
-
-decodeConfirmNetflixData : Decode.Decoder (Maybe String)
-decodeConfirmNetflixData =
-    Decode.maybe (Decode.at [ "data", "netflixUrl" ] Decode.string)
+            Nothing

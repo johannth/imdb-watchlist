@@ -32,7 +32,7 @@ movieIsOfGenre movies selectedGenres movieId =
 
 
 rootView : Model -> Html Msg
-rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, tableState, buildInfo } =
+rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, tableState, buildInfo, error } =
     let
         list =
             Dict.values lists
@@ -44,7 +44,15 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, t
         div [ id "content" ]
             [ h1 [ id "title" ] [ text "Watchlist" ]
             , div [ id "body" ]
-                [ imdbUserIdTextInput imdbUserIdInputCurrentValue
+                [ div [ id "error" ]
+                    [ case error of
+                        Just error ->
+                            text error
+
+                        Nothing ->
+                            text ""
+                    ]
+                , imdbUserIdTextInput imdbUserIdInputCurrentValue
                 , div [ id "imdb-users" ] (Dict.keys lists |> List.map imdbUserIdView)
                 , div [ id "genres" ] (Set.toList genres |> List.sort |> List.map (genreView selectedGenres))
                 , div [ id "list" ]
@@ -90,18 +98,18 @@ config =
         , toMsg = SetTableState
         , columns =
             [ movieTitleColumn
-            , Table.stringColumn "Type" (.itemType >> movieTypetoString)
+            , Table.stringColumn "Type" (.itemType >> movieTypeToString)
             , Table.stringColumn "Genres" (.genres >> Set.toList >> List.sort >> (String.join ", "))
             , releaseYearColumn
             , runTimeColumn
-            , maybeIntColumn "Metascore" .metascore
-            , maybeIntColumn "Tomatometer" .rottenTomatoesMeter
-            , maybeIntColumn "Imdb Rating" .imdbRating
+            , maybeIntColumn "Metascore" (.ratings >> .metascore)
+            , maybeIntColumn "Tomatometer" (.ratings >> .rottenTomatoesMeter)
+            , maybeIntColumn "Imdb Rating" (.ratings >> .imdb)
             , bechdelColumn
-            , streamColumn "Netflix" .netflix
-            , streamColumn "HBO" .hbo
-            , streamColumn "Amazon" .amazon
-            , streamColumn "iTunes" .itunes
+            , streamColumn "Netflix" (.viewingOptions >> .netflix)
+            , streamColumn "HBO" (.viewingOptions >> .hbo)
+            , streamColumn "Amazon" (.viewingOptions >> .amazon)
+            , streamColumn "iTunes" (.viewingOptions >> .itunes)
             , priorityColumn
             ]
         }
@@ -130,9 +138,9 @@ releaseYearColumn =
         maybeIntColumn "Release Year" extractYear
 
 
-cellForOffer : Maybe JustWatchOffer -> Table.HtmlDetails Msg
-cellForOffer offer =
-    case offer of
+cellForOffer : Maybe ViewingOption -> Table.HtmlDetails Msg
+cellForOffer viewingOption =
+    case viewingOption of
         Just (Flatrate _ url _) ->
             linkCell "Free" url
 
@@ -146,7 +154,7 @@ cellForOffer offer =
             Table.HtmlDetails [] []
 
 
-streamColumn : String -> (Movie -> Maybe JustWatchOffer) -> Table.Column Movie Msg
+streamColumn : String -> (Movie -> Maybe ViewingOption) -> Table.Column Movie Msg
 streamColumn name accessor =
     Table.veryCustomColumn
         { name = name
@@ -236,7 +244,7 @@ bechdelColumn : Table.Column Movie Msg
 bechdelColumn =
     let
         accessor =
-            \movie -> Maybe.map State.normalizeBechdel movie.bechdelRating
+            \movie -> Maybe.map State.normalizeBechdel movie.ratings.bechdel
 
         extractWithDefault movie =
             Maybe.withDefault -1 (accessor movie)
@@ -250,7 +258,7 @@ bechdelColumn =
 
 bechdelTooltip : Movie -> String
 bechdelTooltip movie =
-    case movie.bechdelRating of
+    case movie.ratings.bechdel of
         Just bechdel ->
             let
                 prefixWithDubious string =

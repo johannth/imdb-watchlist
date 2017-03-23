@@ -6,6 +6,7 @@ import Http
 import Navigation
 import Date exposing (Date)
 import Set exposing (Set)
+import Json.Decode as Decode
 
 
 type alias Model =
@@ -17,17 +18,17 @@ type alias Model =
     , selectedGenres : Set String
     , buildInfo : BuildInfo
     , tableState : Table.State
+    , error : Maybe String
     }
 
 
 type Msg
-    = LookupWatchList String
-    | ImdbUserIdInput String
-    | LoadWatchList String (Result Http.Error (List WatchListMovie))
+    = ImdbUserIdInput String
+    | LookupWatchList String
+    | ReceivedWatchList String (Result Http.Error (List Movie))
+    | ReceivedMovies (Result Http.Error (List Movie))
+    | Error String
     | ClearList String
-    | LoadBechdel String (Result Http.Error (Maybe BechdelRating))
-    | LoadJustWatch String (Result Http.Error (Maybe JustWatchData))
-    | LoadConfirmNetflix String (Result Http.Error (Maybe String))
     | SetTableState Table.State
     | UrlChange Navigation.Location
     | ToggleGenreFilter String
@@ -43,6 +44,7 @@ emptyModel flags =
     , selectedGenres = Set.empty
     , tableState = Table.initialSort "Priority"
     , buildInfo = BuildInfo flags.buildVersion flags.buildTime flags.buildTier
+    , error = Nothing
     }
 
 
@@ -51,8 +53,8 @@ type MovieType
     | Series
 
 
-movieTypetoString : MovieType -> String
-movieTypetoString itemType =
+movieTypeToString : MovieType -> String
+movieTypeToString itemType =
     case itemType of
         Film ->
             "Film"
@@ -61,16 +63,43 @@ movieTypetoString itemType =
             "Series"
 
 
-type alias WatchListMovie =
-    { id : String
-    , title : String
-    , imdbUrl : String
-    , itemType : MovieType
-    , releaseDate : Maybe Date
-    , runTime : Maybe Int
-    , genres : Set String
-    , metascore : Maybe Int
-    , imdbRating : Maybe Int
+type alias ViewingOptions =
+    { netflix : Maybe ViewingOption
+    , hbo : Maybe ViewingOption
+    , itunes : Maybe ViewingOption
+    , amazon : Maybe ViewingOption
+    }
+
+
+type ViewingOptionPresentationType
+    = SD
+    | HD
+
+
+type ViewingOptionProvider
+    = Amazon
+    | ITunes
+    | Netflix
+    | HBO
+
+
+type ViewingOption
+    = Rent ViewingOptionProvider String ViewingOptionPresentationType Float
+    | Buy ViewingOptionProvider String ViewingOptionPresentationType Float
+    | Flatrate ViewingOptionProvider String ViewingOptionPresentationType
+
+
+type alias BechdelRating =
+    { rating : Int
+    , dubious : Bool
+    }
+
+
+type alias Ratings =
+    { metascore : Maybe Int
+    , rottenTomatoesMeter : Maybe Int
+    , imdb : Maybe Int
+    , bechdel : Maybe BechdelRating
     }
 
 
@@ -82,34 +111,8 @@ type alias Movie =
     , releaseDate : Maybe Date
     , runTime : Maybe Int
     , genres : Set String
-    , metascore : Maybe Int
-    , rottenTomatoesMeter : Maybe Int
-    , imdbRating : Maybe Int
-    , bechdelRating : Maybe BechdelRating
-    , netflix : Maybe JustWatchOffer
-    , hbo : Maybe JustWatchOffer
-    , itunes : Maybe JustWatchOffer
-    , amazon : Maybe JustWatchOffer
-    }
-
-
-watchListMovieToMovie : WatchListMovie -> Movie
-watchListMovieToMovie watchListMovie =
-    { id = watchListMovie.id
-    , title = watchListMovie.title
-    , imdbUrl = watchListMovie.imdbUrl
-    , itemType = watchListMovie.itemType
-    , releaseDate = watchListMovie.releaseDate
-    , runTime = watchListMovie.runTime
-    , genres = watchListMovie.genres
-    , metascore = watchListMovie.metascore
-    , rottenTomatoesMeter = Maybe.Nothing
-    , imdbRating = watchListMovie.imdbRating
-    , bechdelRating = Maybe.Nothing
-    , netflix = Maybe.Nothing
-    , hbo = Maybe.Nothing
-    , itunes = Maybe.Nothing
-    , amazon = Maybe.Nothing
+    , ratings : Ratings
+    , viewingOptions : ViewingOptions
     }
 
 
@@ -138,87 +141,4 @@ type alias BuildInfo =
     { version : String
     , time : String
     , tier : String
-    }
-
-
-
--- JUST WATCH
-
-
-type JustWatchPresentationType
-    = SD
-    | HD
-
-
-type JustWatchProvider
-    = Amazon
-    | ITunes
-    | Netflix
-    | HBO
-
-
-type JustWatchOffer
-    = Rent JustWatchProvider String JustWatchPresentationType Float
-    | Buy JustWatchProvider String JustWatchPresentationType Float
-    | Flatrate JustWatchProvider String JustWatchPresentationType
-
-
-type alias JustWatchScore =
-    { providerType : String
-    , value : Float
-    }
-
-
-providerFromOffer : JustWatchOffer -> JustWatchProvider
-providerFromOffer offer =
-    case offer of
-        Flatrate provider _ _ ->
-            provider
-
-        Rent provider _ _ _ ->
-            provider
-
-        Buy provider _ _ _ ->
-            provider
-
-
-urlFromOffer : JustWatchOffer -> String
-urlFromOffer offer =
-    case offer of
-        Flatrate _ url _ ->
-            url
-
-        Rent _ url _ _ ->
-            url
-
-        Buy _ url _ _ ->
-            url
-
-
-updateUrl : String -> JustWatchOffer -> JustWatchOffer
-updateUrl url offer =
-    case offer of
-        Flatrate provider _ presentationType ->
-            Flatrate provider url presentationType
-
-        Rent provider _ presentationType price ->
-            Rent provider url presentationType price
-
-        Buy provider _ presentationType price ->
-            Rent provider url presentationType price
-
-
-type alias JustWatchData =
-    { offers : List JustWatchOffer
-    , scores : List JustWatchScore
-    }
-
-
-
--- BECHDEL
-
-
-type alias BechdelRating =
-    { rating : Int
-    , dubious : Bool
     }

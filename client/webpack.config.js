@@ -8,37 +8,37 @@ var child_process = require('child_process');
 var TIER = process.env.TIER || 'development';
 
 let gitVersion = child_process.execSync('git rev-parse HEAD', {
-  encoding: 'utf8'
+  encoding: 'utf8',
 });
 
 var commonConfig = {
   output: {
     path: path.resolve(__dirname, 'dist/'),
-    filename: '[hash].js'
+    filename: '[hash].js',
   },
 
   resolve: {
     modulesDirectories: ['node_modules'],
-    extensions: ['', '.js', '.elm']
+    extensions: ['', '.js', '.elm'],
   },
 
   plugins: [
     new HtmlWebpackPlugin({
       template: 'src/static/index.html',
       inject: 'body',
-      filename: 'index.html'
+      filename: 'index.html',
     }),
     new webpack.DefinePlugin({
       BUILD_TIME: JSON.stringify(new Date()),
       BUILD_VERSION: JSON.stringify(gitVersion),
       BUILD_TIER: JSON.stringify(TIER),
       API_HOST: JSON.stringify(
-        TIER === 'development' ? 'http://localhost:3001' : process.env.API_HOST
-      )
-    })
+        TIER === 'development' ? 'localhost:3001' : process.env.API_HOST
+      ),
+    }),
   ],
 
-  postcss: [require('autoprefixer')]
+  postcss: [require('autoprefixer')],
 };
 
 if (TIER === 'development') {
@@ -47,12 +47,12 @@ if (TIER === 'development') {
   module.exports = merge(commonConfig, {
     entry: [
       'webpack-dev-server/client?http://localhost:8080',
-      path.join(__dirname, 'src/static/index.js')
+      path.join(__dirname, 'src/static/index.js'),
     ],
 
     devServer: {
       inline: true,
-      progress: true
+      progress: true,
     },
 
     module: {
@@ -60,14 +60,14 @@ if (TIER === 'development') {
         {
           test: /\.elm$/,
           exclude: [/elm-stuff/, /node_modules/],
-          loader: 'elm-hot!elm-webpack?verbose=true&warn=true&debug=true'
+          loader: 'elm-hot!elm-webpack?verbose=true&warn=true&debug=true',
         },
         {
           test: /\.css$/,
-          loaders: ['style-loader', 'css-loader', 'postcss-loader']
-        }
-      ]
-    }
+          loaders: ['style-loader', 'css-loader', 'postcss-loader'],
+        },
+      ],
+    },
   });
 }
 
@@ -80,16 +80,16 @@ if (TIER === 'production') {
         {
           test: /\.elm$/,
           exclude: [/elm-stuff/, /node_modules/],
-          loader: 'elm-webpack'
+          loader: 'elm-webpack',
         },
         {
           test: /\.css$/,
           loader: ExtractTextPlugin.extract('style-loader', [
             'css-loader',
-            'postcss-loader'
-          ])
-        }
-      ]
+            'postcss-loader',
+          ]),
+        },
+      ],
     },
 
     plugins: [
@@ -99,8 +99,8 @@ if (TIER === 'production') {
 
       new webpack.optimize.UglifyJsPlugin({
         minimize: true,
-        compressor: { warnings: false }
-      })
-    ]
+        compressor: { warnings: false },
+      }),
+    ],
   });
 }

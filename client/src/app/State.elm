@@ -6,7 +6,6 @@ import Types exposing (..)
 import Utils
 import Navigation
 import UrlParser exposing ((<?>))
-import Date
 import Set
 
 
@@ -62,99 +61,44 @@ update msg model =
             in
                 newModel ! [ Navigation.modifyUrl (updatedUrl newModel) ]
 
-        LoadWatchList imdbUserId (Err error) ->
+        ReceivedWatchList imdbUserId (Err error) ->
             model ! []
 
-        LoadWatchList imdbUserId (Ok watchListMovies) ->
+        ReceivedWatchList imdbUserId (Ok movies) ->
             let
                 listOfIds =
-                    List.map .id watchListMovies
+                    List.map .id movies
 
                 newMovies =
-                    List.map (Utils.lift2 .id watchListMovieToMovie) watchListMovies
+                    List.map (Utils.lift2 .id identity) movies
                         |> Dict.fromList
-
-                bechdelCommands =
-                    List.map (Api.getBechdelData model.apiHost) listOfIds
-
-                justWatchCommands =
-                    List.map (\movie -> Api.getJustWatchData model.apiHost movie.id movie.title movie.itemType (Maybe.map Date.year movie.releaseDate)) watchListMovies
 
                 newGenres =
                     List.foldl Set.union Set.empty (List.map .genres (Dict.values newMovies))
+
+                batchesOfMovies =
+                    Utils.batches 40 (Dict.values newMovies)
             in
                 { model
                     | lists = Dict.insert imdbUserId listOfIds model.lists
                     , movies = Dict.union newMovies model.movies
                     , genres = Set.union newGenres model.genres
                 }
-                    ! (justWatchCommands ++ bechdelCommands)
+                    ! List.map (Api.getBatchDetailedMovieData model.apiHost) batchesOfMovies
 
-        LoadBechdel imdbId (Err error) ->
+        ReceivedMovies (Err error) ->
             model ! []
 
-        LoadBechdel imdbId (Ok bechdelRating) ->
-            case Dict.get imdbId model.movies of
-                Just movie ->
-                    let
-                        updatedMovie =
-                            { movie | bechdelRating = bechdelRating }
-                    in
-                        { model | movies = Dict.insert imdbId updatedMovie model.movies } ! []
+        ReceivedMovies (Ok movies) ->
+            let
+                newMovies =
+                    List.map (Utils.lift2 .id identity) movies
+                        |> Dict.fromList
+            in
+                { model | movies = Dict.union newMovies model.movies } ! []
 
-                Nothing ->
-                    model ! []
-
-        LoadJustWatch imdbId (Err error) ->
-            model ! []
-
-        LoadJustWatch imdbId (Ok justWatchData) ->
-            case ( Dict.get imdbId model.movies, justWatchData ) of
-                ( Just movie, Just justWatchData ) ->
-                    let
-                        updatedMovie =
-                            { movie
-                                | rottenTomatoesMeter = Maybe.map round (extractScore "tomato:meter" justWatchData.scores)
-                                , netflix = extractBestOffer Netflix justWatchData.offers
-                                , hbo = extractBestOffer HBO justWatchData.offers
-                                , amazon = extractBestOffer Amazon justWatchData.offers
-                                , itunes = extractBestOffer ITunes justWatchData.offers
-                            }
-
-                        newMovies =
-                            Dict.insert imdbId updatedMovie model.movies
-                    in
-                        { model | movies = newMovies }
-                            ! [ Api.getConfirmNetflixData model.apiHost imdbId updatedMovie.title (Maybe.map Date.year updatedMovie.releaseDate) (Maybe.map urlFromOffer updatedMovie.netflix) ]
-
-                _ ->
-                    model ! []
-
-        LoadConfirmNetflix imdbId (Err error) ->
-            model ! []
-
-        LoadConfirmNetflix imdbId (Ok maybeNetflixUrl) ->
-            case Dict.get imdbId model.movies of
-                Just movie ->
-                    let
-                        updatedMovie =
-                            { movie
-                                | netflix =
-                                    case ( maybeNetflixUrl, movie.netflix ) of
-                                        ( Just netflixUrl, Just netflixOffer ) ->
-                                            Maybe.Just (updateUrl netflixUrl netflixOffer)
-
-                                        ( Just netflixUrl, Nothing ) ->
-                                            Maybe.Just (Flatrate Netflix netflixUrl HD)
-
-                                        ( _, _ ) ->
-                                            Maybe.Nothing
-                            }
-                    in
-                        { model | movies = Dict.insert imdbId updatedMovie model.movies } ! []
-
-                Nothing ->
-                    model ! []
+        Error error ->
+            { model | error = Just error } ! []
 
         SetTableState newState ->
             { model | tableState = newState } ! []
@@ -171,52 +115,11 @@ update msg model =
                 ! []
 
 
-extractBestOffer : JustWatchProvider -> List JustWatchOffer -> Maybe JustWatchOffer
-extractBestOffer provider offers =
-    List.filter (\offer -> (providerFromOffer offer) == provider) offers
-        |> List.sortWith offerOrder
-        |> List.head
-
-
-offerOrder : JustWatchOffer -> JustWatchOffer -> Order
-offerOrder offerA offerB =
-    compare (offerOrdinal offerA) (offerOrdinal offerB)
-
-
-offerOrdinal : JustWatchOffer -> ( Int, Int, Float )
-offerOrdinal offer =
-    let
-        presentationTypeOrdinal presentationType =
-            case presentationType of
-                SD ->
-                    1
-
-                HD ->
-                    0
-    in
-        case offer of
-            Flatrate _ _ presentationType ->
-                ( 0, presentationTypeOrdinal presentationType, 0 )
-
-            Rent _ _ presentationType price ->
-                ( 1, presentationTypeOrdinal presentationType, price )
-
-            Buy _ _ presentationType price ->
-                ( 2, presentationTypeOrdinal presentationType, price )
-
-
-extractScore : String -> List JustWatchScore -> Maybe Float
-extractScore provider scores =
-    List.filter (\score -> score.providerType == provider) scores
-        |> List.head
-        |> Maybe.map .value
-
-
 calculateStreamabilityWeight : Movie -> Float
 calculateStreamabilityWeight movie =
-    if List.any Utils.maybeHasValue [ movie.netflix, movie.hbo ] then
+    if List.any Utils.maybeHasValue [ movie.viewingOptions.netflix, movie.viewingOptions.hbo ] then
         1
-    else if List.any Utils.maybeHasValue [ movie.itunes, movie.amazon ] then
+    else if List.any Utils.maybeHasValue [ movie.viewingOptions.itunes, movie.viewingOptions.amazon ] then
         0.7
     else
         0.1
@@ -272,15 +175,15 @@ calculatePriorityWithWeights weights movie =
             normalizeRunTime (extractValueToFloat 90 movie.runTime)
 
         normalizedBechdel =
-            extractValueToFloat 50 (Maybe.map normalizeBechdel movie.bechdelRating)
+            extractValueToFloat 50 (Maybe.map normalizeBechdel movie.ratings.bechdel)
     in
         streamabilityWeight
             * (weights.metascore
-                * (extractValueToFloat 50 movie.metascore)
+                * (extractValueToFloat 50 movie.ratings.metascore)
                 + weights.tomatoMeter
-                * (extractValueToFloat 50 movie.rottenTomatoesMeter)
+                * (extractValueToFloat 50 movie.ratings.rottenTomatoesMeter)
                 + weights.imdbRating
-                * (extractValueToFloat 50 movie.imdbRating)
+                * (extractValueToFloat 50 movie.ratings.imdb)
                 + weights.bechdel
                 * normalizedBechdel
                 + weights.runTime
