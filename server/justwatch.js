@@ -8,18 +8,16 @@ const findBestPossibleJustwatchResult = (title, year, type, results) => {
     return null;
   }
 
-  return results.filter(result => {
+  return results.filter((result) => {
     const titleMatch = leven(result.title.toLowerCase(), title.toLowerCase());
-    const titleAndYearMatch = titleMatch === 0 &&
-      result.original_release_year === year;
-    const fuzzyTitleAndYearMatch = titleMatch <= 5 &&
-      result.original_release_year === year;
+    const titleAndYearMatch = titleMatch === 0 && result.original_release_year === year;
+    const fuzzyTitleAndYearMatch = titleMatch <= 5 && result.original_release_year === year;
     const titleMatchesForSeries = titleMatch === 0 && type === 'series';
     return titleAndYearMatch || fuzzyTitleAndYearMatch || titleMatchesForSeries;
   })[0];
 };
 
-const justwatchType = itemType => {
+const justwatchType = (itemType) => {
   switch (itemType) {
     case 'film':
       return 'movie';
@@ -37,7 +35,7 @@ const justWatchProviders = {
 
 const extractBestViewingOption = (provider, viewingOptions) => {
   const viewingOptionsByProvider = viewingOptions.filter(
-    viewingOption => viewingOption.provider === provider
+    viewingOption => viewingOption.provider === provider,
   );
 
   viewingOptionsByProvider.sort((viewingOptionA, viewingOptionB) => {
@@ -56,10 +54,8 @@ const extractBestViewingOption = (provider, viewingOptions) => {
   return viewingOptionsByProvider[0] || null;
 };
 
-const viewingOptionOrdinal = viewingOption => {
-  const presentationTypeOrdinal = viewingOption.presentationType === 'hd'
-    ? 0
-    : 1;
+const viewingOptionOrdinal = (viewingOption) => {
+  const presentationTypeOrdinal = viewingOption.presentationType === 'hd' ? 0 : 1;
   switch (viewingOption.monetizationType) {
     case 'flatrate':
       return [0, presentationTypeOrdinal, 0];
@@ -70,12 +66,7 @@ const viewingOptionOrdinal = viewingOption => {
   }
 };
 
-export const fetchJustWatchData = (
-  imdbId,
-  title,
-  type,
-  releaseDateTimestamp
-) => {
+export const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) => {
   const releaseDate = new Date(releaseDateTimestamp);
   const year = releaseDate.getFullYear();
   return fetch('https://api.justwatch.com/titles/en_US/popular', {
@@ -91,13 +82,8 @@ export const fetchJustWatchData = (
   })
     .then(handleErrors)
     .then(response => response.json())
-    .then(json => {
-      const possibleItem = findBestPossibleJustwatchResult(
-        title,
-        year,
-        type,
-        json.items
-      );
+    .then((json) => {
+      const possibleItem = findBestPossibleJustwatchResult(title, year, type, json.items);
 
       if (!possibleItem) {
         throw Error(`${imdbId}: ${title} was not found at JustWatch`);
@@ -107,7 +93,7 @@ export const fetchJustWatchData = (
 
       const offers = item.offers || [];
 
-      const viewingOptions = offers.map(offer => {
+      const viewingOptions = offers.map((offer) => {
         const provider = justWatchProviders[offer.provider_id];
         return viewingOptionData({
           provider,

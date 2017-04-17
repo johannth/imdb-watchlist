@@ -1,4 +1,4 @@
-'use strict';
+
 /**
  * New Relic agent configuration.
  *
@@ -9,13 +9,13 @@ exports.config = {
   /**
    * Array of application names.
    */
-  app_name: [ 'imdb-watchlist-server' ],
+  app_name: ['imdb-watchlist-server'],
   logging: {
     /**
      * Level at which to log. 'trace' is most useful to New Relic when diagnosing
      * issues with the agent, 'info' and higher will impose the least overhead on
      * production applications.
      */
-    level: 'info'
-  }
+    level: 'info',
+  },
 };

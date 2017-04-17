@@ -14,7 +14,7 @@ const app = express();
 
 const cachePromise = createCache({
   url: process.env.REDIS_URL,
-  writeOnly: process.env.DISABLE_CACHE,
+  writeOnly: process.env.DISABLE_CACHE
 });
 if (process.env.DISABLE_CACHE) {
   console.log('Cache is disabled');
@@ -59,14 +59,14 @@ const fetchMovieDetails = movie => {
     ).catch(error => {
       console.log('Netflix', error);
       return { netflixUrl: null };
-    }),
+    })
   ])
     .then(bechdelRating_justWatch_localNetflixUrl => {
       const bechdelRating = bechdelRating_justWatch_localNetflixUrl[0];
 
       const {
         viewingOptions,
-        ratings,
+        ratings
       } = bechdelRating_justWatch_localNetflixUrl[1];
 
       const { netflixUrl } = bechdelRating_justWatch_localNetflixUrl[2];
@@ -75,7 +75,7 @@ const fetchMovieDetails = movie => {
             provider: 'netflix',
             presentationType: 'hd',
             monetizationType: 'flatrate',
-            url: netflixUrl,
+            url: netflixUrl
           })
         : null;
 
@@ -88,7 +88,7 @@ const fetchMovieDetails = movie => {
         rottenTomatoesMeter: ratings && ratings.rottenTomatoesMeter,
         amazon: viewingOptions && viewingOptions.amazon,
         itunes: viewingOptions && viewingOptions.itunes,
-        hbo: viewingOptions && viewingOptions.hbo,
+        hbo: viewingOptions && viewingOptions.hbo
       });
     })
     .catch(error => {
