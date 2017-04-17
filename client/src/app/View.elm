@@ -130,6 +130,7 @@ config maybeMovieVotes =
             , Table.stringColumn "Genres" (.genres >> Set.toList >> List.sort >> (String.join ", "))
             , releaseYearColumn
             , runTimeColumn
+            , Table.intColumn "# of Episodes" .numberOfEpisodes
             , maybeIntColumn "Metascore" (.ratings >> .metascore)
             , maybeIntColumn "Tomatometer" (.ratings >> .rottenTomatoesMeter)
             , maybeIntColumn "Imdb Rating" (.ratings >> .imdb)

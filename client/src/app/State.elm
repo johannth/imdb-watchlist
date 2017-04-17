@@ -62,7 +62,11 @@ update msg model =
                 newModel ! [ Navigation.modifyUrl (updatedUrl newModel) ]
 
         ReceivedWatchList imdbUserId (Err error) ->
-            model ! []
+            let
+                message =
+                    Debug.log "Error" error
+            in
+                model ! []
 
         ReceivedWatchList imdbUserId (Ok movies) ->
             let
@@ -87,7 +91,11 @@ update msg model =
                     ! List.map (Api.getBatchDetailedMovieData model.apiHost) batchesOfMovies
 
         ReceivedMovies (Err error) ->
-            model ! []
+            let
+                message =
+                    Debug.log "Error" error
+            in
+                model ! []
 
         ReceivedMovies (Ok movies) ->
             let
@@ -162,6 +170,21 @@ calculatePriority nrOfVotes =
     calculatePriorityWithWeights nrOfVotes defaultPriorityWeights
 
 
+calculateAverage : List (Maybe Int) -> Float
+calculateAverage list =
+    let
+        values =
+            List.filterMap identity list
+
+        numberOfValues =
+            List.length values
+    in
+        if numberOfValues == 0 then
+            50
+        else
+            (toFloat (List.sum values)) / (toFloat numberOfValues)
+
+
 calculatePriorityWithWeights : Int -> PriorityWeights -> Movie -> Float
 calculatePriorityWithWeights nrOfVotes weights movie =
     let
@@ -171,11 +194,20 @@ calculatePriorityWithWeights nrOfVotes weights movie =
         streamabilityWeight =
             calculateStreamabilityWeight movie
 
+        runTime =
+            (extractValueToFloat 90 movie.runTime)
+
         normalizedRunTime =
-            normalizeRunTime (extractValueToFloat 90 movie.runTime)
+            normalizeRunTime runTime
+
+        normalizedTotalRunTime =
+            normalizeRunTime (runTime * (toFloat movie.numberOfEpisodes))
 
         normalizedBechdel =
             extractValueToFloat 50 (Maybe.map normalizeBechdel movie.ratings.bechdel)
+
+        defaultRatingIfMissing =
+            calculateAverage [ movie.ratings.metascore, movie.ratings.rottenTomatoesMeter, movie.ratings.imdb ]
 
         nrOfVotesWeight =
             toFloat nrOfVotes
@@ -183,15 +215,15 @@ calculatePriorityWithWeights nrOfVotes weights movie =
         nrOfVotesWeight
             * streamabilityWeight
             * (weights.metascore
-                * (extractValueToFloat 50 movie.ratings.metascore)
+                * (extractValueToFloat defaultRatingIfMissing movie.ratings.metascore)
                 + weights.tomatoMeter
-                * (extractValueToFloat 50 movie.ratings.rottenTomatoesMeter)
+                * (extractValueToFloat defaultRatingIfMissing movie.ratings.rottenTomatoesMeter)
                 + weights.imdbRating
-                * (extractValueToFloat 50 movie.ratings.imdb)
+                * (extractValueToFloat defaultRatingIfMissing movie.ratings.imdb)
                 + weights.bechdel
                 * normalizedBechdel
                 + weights.runTime
-                * normalizedRunTime
+                * (0.7 * normalizedRunTime + 0.3 * normalizedTotalRunTime)
               )
 
 
@@ -199,17 +231,17 @@ defaultPriorityWeights : PriorityWeights
 defaultPriorityWeights =
     let
         runTimeWeight =
-            3 / 9
+            2 / 9
 
         ratingWeight =
-            4 / 9
+            5 / 9
 
         bechdelWeight =
             2 / 9
     in
         { runTime = runTimeWeight
-        , metascore = ratingWeight / 3
-        , tomatoMeter = ratingWeight / 3
-        , imdbRating = ratingWeight / 3
+        , metascore = ratingWeight * 3 / 6
+        , tomatoMeter = ratingWeight * 2 / 6
+        , imdbRating = ratingWeight * 1 / 6
         , bechdel = bechdelWeight
         }

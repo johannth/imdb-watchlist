@@ -5,6 +5,7 @@ export const movieData = ({
   type,
   releaseDate,
   runTime,
+  numberOfEpisodes,
   genres,
   metascore,
   rottenTomatoesMeter,
@@ -21,6 +22,7 @@ export const movieData = ({
   type,
   releaseDate,
   runTime,
+  numberOfEpisodes,
   genres,
   ratings: {
     metascore,
@@ -36,7 +38,13 @@ export const movieData = ({
   },
 });
 
-export const viewingOptionData = ({ provider, url, monetizationType, presentationType, price }) => ({
+export const viewingOptionData = ({
+  provider,
+  url,
+  monetizationType,
+  presentationType,
+  price,
+}) => ({
   provider,
   url,
   monetizationType,

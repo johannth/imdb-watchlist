@@ -110,6 +110,7 @@ type alias Movie =
     , itemType : MovieType
     , releaseDate : Maybe Date
     , runTime : Maybe Int
+    , numberOfEpisodes : Int
     , genres : Set String
     , ratings : Ratings
     , viewingOptions : ViewingOptions

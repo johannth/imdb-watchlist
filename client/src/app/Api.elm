@@ -4,7 +4,7 @@ import Json.Decode as Decode
 import Http
 import Types exposing (..)
 import Date exposing (Date)
-import Utils exposing (map9)
+import Utils exposing (map10)
 import Set
 import Json.Encode as Encode
 
@@ -32,13 +32,14 @@ getBatchDetailedMovieData apiHost movies =
 
 decodeMovie : Decode.Decoder Movie
 decodeMovie =
-    map9 Movie
+    map10 Movie
         (Decode.field "id" Decode.string)
         (Decode.field "title" Decode.string)
         (Decode.field "imdbUrl" Decode.string)
         decodeItemType
         decodeMovieReleaseDate
         (Decode.maybe (Decode.field "runTime" Decode.int))
+        (Decode.field "numberOfEpisodes" Decode.int)
         (Decode.field "genres" (Decode.map Set.fromList (Decode.list Decode.string)))
         (Decode.field "ratings" decodeRatings)
         (Decode.field "viewingOptions" decodeViewingOptions)
@@ -67,6 +68,7 @@ encodeMovie movie =
                 Nothing ->
                     Encode.null
           )
+        , ( "numberOfEpisodes", Encode.int movie.numberOfEpisodes )
         , ( "genres", Encode.list (List.map Encode.string (Set.toList movie.genres)) )
         , ( "ratings", encodeRatings movie.ratings )
         , ( "viewingOptions", Encode.null )
