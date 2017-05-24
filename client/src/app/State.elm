@@ -125,7 +125,7 @@ update msg model =
 
 calculateStreamabilityWeight : Movie -> Float
 calculateStreamabilityWeight movie =
-    if List.any Utils.maybeHasValue [ movie.viewingOptions.netflix, movie.viewingOptions.hbo ] then
+    if List.any Utils.maybeHasValue [ movie.viewingOptions.netflix, movie.viewingOptions.hbo, movie.viewingOptions.showtime ] then
         1
     else if List.any Utils.maybeHasValue [ movie.viewingOptions.itunes, movie.viewingOptions.amazon ] then
         0.7

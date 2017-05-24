@@ -15,6 +15,7 @@ export const movieData = ({
   hbo,
   itunes,
   amazon,
+  showtime,
 }) => ({
   id,
   title,
@@ -35,6 +36,7 @@ export const movieData = ({
     hbo: hbo || null,
     itunes: itunes || null,
     amazon: amazon || null,
+    showtime: showtime || null,
   },
 });
 

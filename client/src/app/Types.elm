@@ -68,6 +68,7 @@ type alias ViewingOptions =
     , hbo : Maybe ViewingOption
     , itunes : Maybe ViewingOption
     , amazon : Maybe ViewingOption
+    , showtime : Maybe ViewingOption
     }
 
 
@@ -81,6 +82,7 @@ type ViewingOptionProvider
     | ITunes
     | Netflix
     | HBO
+    | Showtime
 
 
 type ViewingOption

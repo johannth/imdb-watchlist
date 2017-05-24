@@ -31,6 +31,7 @@ const justWatchProviders = {
   8: 'netflix',
   10: 'amazon',
   27: 'hbo',
+  37: 'showtime',
 };
 
 const extractBestViewingOption = (provider, viewingOptions) => {
@@ -42,7 +43,7 @@ const extractBestViewingOption = (provider, viewingOptions) => {
     const ordinalA = viewingOptionOrdinal(viewingOptionA);
     const ordinalB = viewingOptionOrdinal(viewingOptionB);
 
-    for (var i = 0; i !== ordinalA.length; i++) {
+    for (let i = 0; i !== ordinalA.length; i++) {
       const result = ordinalA[i] - ordinalB[i];
       if (result !== 0) {
         return result;
@@ -108,6 +109,7 @@ export const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) =>
       const amazon = extractBestViewingOption('amazon', viewingOptions);
       const hbo = extractBestViewingOption('hbo', viewingOptions);
       const itunes = extractBestViewingOption('itunes', viewingOptions);
+      const showtime = extractBestViewingOption('showtime', viewingOptions);
 
       const scoring = item.scoring;
 
@@ -121,6 +123,7 @@ export const fetchJustWatchData = (imdbId, title, type, releaseDateTimestamp) =>
           amazon,
           hbo,
           itunes,
+          showtime,
         },
         ratings: {
           rottenTomatoesMeter,

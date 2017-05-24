@@ -150,11 +150,12 @@ encodeBechdel bechdelRating =
 
 decodeViewingOptions : Decode.Decoder ViewingOptions
 decodeViewingOptions =
-    Decode.map4 ViewingOptions
+    Decode.map5 ViewingOptions
         (unwrapDecoder (Decode.maybe (Decode.field "netflix" decodeViewingOption)))
         (unwrapDecoder (Decode.maybe (Decode.field "hbo" decodeViewingOption)))
         (unwrapDecoder (Decode.maybe (Decode.field "itunes" decodeViewingOption)))
         (unwrapDecoder (Decode.maybe (Decode.field "amazon" decodeViewingOption)))
+        (unwrapDecoder (Decode.maybe (Decode.field "showtime" decodeViewingOption)))
 
 
 unwrapDecoder : Decode.Decoder (Maybe (Maybe a)) -> Decode.Decoder (Maybe a)
@@ -211,6 +212,9 @@ convertProviderId providerString =
 
         "hbo" ->
             Just HBO
+
+        "showtime" ->
+            Just Showtime
 
         _ ->
             Nothing

@@ -137,6 +137,7 @@ config maybeMovieVotes =
             , bechdelColumn
             , streamColumn "Netflix" (.viewingOptions >> .netflix)
             , streamColumn "HBO" (.viewingOptions >> .hbo)
+            , streamColumn "Showtime" (.viewingOptions >> .showtime)
             , streamColumn "Amazon" (.viewingOptions >> .amazon)
             , streamColumn "iTunes" (.viewingOptions >> .itunes)
             ]
