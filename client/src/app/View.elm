@@ -56,6 +56,9 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, t
                 |> Set.filter (movieIsOfGenre movies selectedGenres)
                 |> Set.toList
 
+        maxNumberOfVotes =
+            Dict.size lists
+
         movieVotes =
             if Dict.size lists == 1 then
                 Nothing
@@ -91,7 +94,7 @@ rootView { imdbUserIdInputCurrentValue, lists, movies, genres, selectedGenres, t
                                 expandedList =
                                     List.filterMap (\movieId -> Dict.get movieId movies) list
                             in
-                                Table.view (config movieVotes) tableState expandedList
+                                Table.view (config maxNumberOfVotes movieVotes) tableState expandedList
                     ]
                 ]
             , div [ id "footer" ]
@@ -112,8 +115,8 @@ genreView selectedGenres genre =
         a [ classList [ ( "genre", True ), ( "selected", isSelected ) ], href "#", Html.Events.onClick (ToggleGenreFilter genre) ] [ text genre ]
 
 
-config : Maybe (Dict String Int) -> Table.Config Movie Msg
-config maybeMovieVotes =
+config : Int -> Maybe (Dict String Int) -> Table.Config Movie Msg
+config maxNumberOfVotes maybeMovieVotes =
     let
         countColumn =
             (case maybeMovieVotes of
@@ -142,7 +145,7 @@ config maybeMovieVotes =
             , streamColumn "iTunes" (.viewingOptions >> .itunes)
             ]
                 ++ countColumn
-                ++ [ priorityColumn (Maybe.withDefault Dict.empty maybeMovieVotes)
+                ++ [ priorityColumn maxNumberOfVotes (Maybe.withDefault Dict.empty maybeMovieVotes)
                    ]
     in
         Table.config
@@ -331,14 +334,14 @@ cellWithTooltip value tooltip =
         ]
 
 
-priorityColumn : Dict String Int -> Table.Column Movie Msg
-priorityColumn movieCounts =
+priorityColumn : Int -> Dict String Int -> Table.Column Movie Msg
+priorityColumn maxNumberOfVotes movieCounts =
     let
         nrOfListAppearances =
             \movie -> Maybe.withDefault 1 (Dict.get movie.id movieCounts)
 
         calculatePriority =
-            \movie -> (State.calculatePriority (nrOfListAppearances movie) movie)
+            \movie -> (State.calculatePriority maxNumberOfVotes (nrOfListAppearances movie) movie)
     in
         Table.customColumn
             { name = "Priority"

@@ -165,9 +165,9 @@ normalizeRunTimeWithParameters optimalRunTime optimalRunTimeScore runTime =
         k / (runTime ^ 2 + k) * 100
 
 
-calculatePriority : Int -> Movie -> Float
-calculatePriority nrOfVotes =
-    calculatePriorityWithWeights nrOfVotes defaultPriorityWeights
+calculatePriority : Int -> Int -> Movie -> Float
+calculatePriority maxVotes nrOfVotes =
+    calculatePriorityWithWeights maxVotes nrOfVotes defaultPriorityWeights
 
 
 calculateAverage : List (Maybe Int) -> Float
@@ -185,8 +185,8 @@ calculateAverage list =
             (toFloat (List.sum values)) / (toFloat numberOfValues)
 
 
-calculatePriorityWithWeights : Int -> PriorityWeights -> Movie -> Float
-calculatePriorityWithWeights nrOfVotes weights movie =
+calculatePriorityWithWeights : Int -> Int -> PriorityWeights -> Movie -> Float
+calculatePriorityWithWeights maxVotes nrOfVotes weights movie =
     let
         extractValueToFloat default maybeInt =
             Maybe.withDefault default (Maybe.map toFloat maybeInt)
@@ -210,7 +210,7 @@ calculatePriorityWithWeights nrOfVotes weights movie =
             calculateAverage [ movie.ratings.metascore, movie.ratings.rottenTomatoesMeter, movie.ratings.imdb ]
 
         nrOfVotesWeight =
-            toFloat nrOfVotes
+            0.7 + 0.3 * (toFloat nrOfVotes / toFloat maxVotes)
     in
         nrOfVotesWeight
             * streamabilityWeight
